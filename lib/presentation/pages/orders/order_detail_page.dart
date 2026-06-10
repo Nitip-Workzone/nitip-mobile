@@ -468,6 +468,25 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
         if (!isRunner && order.completionCode != null && isDelivering)
           _buildQrSection(order.completionCode!, primary),
+
+        // Review button for completed orders (requester only)
+        if (!isRunner && order.status == 'completed') ...[
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/orders/${order.id}/review'),
+              icon: const Icon(Icons.rate_review_rounded, size: 20),
+              label: const Text('Beri Review untuk Runner', style: TextStyle(fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.secondary,
+                side: const BorderSide(color: AppColors.secondary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -9,17 +9,18 @@ import 'presentation/pages/welcome/welcome_page.dart';
 import 'presentation/pages/auth/login_page.dart';
 import 'presentation/pages/auth/register_page.dart';
 import 'presentation/pages/dashboard/dashboard_page.dart';
-// import 'presentation/pages/kyc/kyc_intro_page.dart';
-// import 'presentation/pages/kyc/kyc_verified_benefits_page.dart';
+import 'presentation/pages/kyc/kyc_intro_page.dart';
+import 'presentation/pages/kyc/kyc_verified_benefits_page.dart';
 import 'presentation/pages/notification/notification_page.dart';
 import 'presentation/pages/info/faq_page.dart';
 import 'presentation/pages/wallet/transaction_history_page.dart';
 import 'presentation/pages/wallet/withdraw_page.dart';
-// import 'presentation/pages/orders/titip_beli_page.dart';
-// import 'presentation/pages/orders/titip_kirim_page.dart';
+import 'presentation/pages/orders/titip_beli_page.dart';
+import 'presentation/pages/orders/titip_kirim_page.dart';
 import 'presentation/pages/orders/explore_orders_page.dart';
 import 'presentation/pages/orders/order_detail_page.dart';
 import 'presentation/pages/dashboard/tabs/orders_tab.dart';
+import 'presentation/pages/reviews/submit_review_page.dart';
 
 import 'presentation/providers/auth_provider.dart';
 
@@ -87,14 +88,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/dashboard',
         builder: (context, state) => const DashboardPage(),
       ),
-      // GoRoute(
-      //   path: '/kyc-intro',
-      //   builder: (context, state) => const KycIntroPage(),
-      // ),
-      // GoRoute(
-      //   path: '/kyc-benefits',
-      //   builder: (context, state) => const KycVerifiedBenefitsPage(),
-      // ),
+      GoRoute(
+        path: '/kyc-intro',
+        builder: (context, state) => const KycIntroPage(),
+      ),
+      GoRoute(
+      path: '/kyc-benefits',
+      builder: (context, state) => const KycVerifiedBenefitsPage(),
+      ),
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationPage(),
@@ -111,14 +112,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/wallet/withdraw',
         builder: (context, state) => const WithdrawPage(),
       ),
-      // GoRoute(
-      //   path: '/orders/titip-beli',
-      //   builder: (context, state) => const TitipBeliPage(),
-      // ),
-      // GoRoute(
-      //   path: '/orders/titip-kirim',
-      //   builder: (context, state) => const TitipKirimPage(),
-      // ),
+      GoRoute(
+      path: '/orders/titip-beli',
+      builder: (context, state) => const TitipBeliPage(),
+      ),
+      GoRoute(
+      path: '/orders/titip-kirim',
+      builder: (context, state) => const TitipKirimPage(),
+      ),
       GoRoute(
         path: '/orders/explore',
         builder: (context, state) => const ExploreOrdersPage(),
@@ -126,6 +127,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/orders/detail/:id',
         builder: (context, state) => OrderDetailPage(orderId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/orders/:id/review',
+        builder: (context, state) => SubmitReviewPage(
+          orderId: state.pathParameters['id']!,
+          runnerName: state.uri.queryParameters['runnerName'],
+        ),
       ),
       GoRoute(
         path: '/orders/active',

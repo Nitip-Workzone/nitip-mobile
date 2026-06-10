@@ -514,7 +514,7 @@ class _QuickActionsGrid extends StatelessWidget {
         const SizedBox(height: 24),
         _buildCategoryGroup(outerContext, 'Akun & Saldo', [
           _ActionData(Icons.account_balance_wallet_rounded, 'Dompet', () => ref.read(dashboardIndexProvider.notifier).state = 2),
-          _ActionData(Icons.support_agent_rounded, 'Pusat Bantuan', null, isEnabled: false),
+          _ActionData(Icons.support_agent_rounded, 'Pusat Bantuan', () => outerContext.push('/faq')),
         ]),
       ],
     );
@@ -540,8 +540,8 @@ class _QuickActionsGrid extends StatelessWidget {
       childAspectRatio: 0.8,
       children: items.map((item) {
         return GestureDetector(
-          onTap: item.isEnabled ? item.onTap : () {
-            ScaffoldMessenger.of(outerContext).showSnackBar(SnackBar(content: Text('Fitur ${item.label} sedang dalam pengembangan'), behavior: SnackBarBehavior.floating, backgroundColor: primary));
+          onTap: item.onTap ?? () {
+            
           },
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -549,11 +549,11 @@ class _QuickActionsGrid extends StatelessWidget {
               Container(
                 width: 46,
                 height: 46,
-                decoration: BoxDecoration(color: item.isEnabled ? primary.withValues(alpha: 0.08) : const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14)),
-                child: Icon(item.icon, color: item.isEnabled ? primary : const Color(0xFFCBD5E1), size: 22),
+                decoration: BoxDecoration(color: primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
+                child: Icon(item.icon, color: primary, size: 22),
               ),
               const SizedBox(height: 8),
-              Text(item.label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: item.isEnabled ? const Color(0xFF334155) : const Color(0xFF94A3B8))),
+              Text(item.label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
             ],
           ),
         );
@@ -566,8 +566,7 @@ class _ActionData {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool isEnabled;
-  _ActionData(this.icon, this.label, this.onTap, {this.isEnabled = true});
+  _ActionData(this.icon, this.label, this.onTap);
 }
 
 class _TodayOrderList extends StatelessWidget {
