@@ -1,0 +1,86 @@
+name: nitip_flutter_mobile
+description: "Nitip Mobile Application - Flutter Migration"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^17.2.2
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.3.5
+
+  # Networking
+  dio: ^5.4.1
+
+  # Crypto (HMAC-SHA256 for API signature)
+  crypto: ^3.0.6
+
+  # Local Storage (JWT Security)
+  flutter_secure_storage: ^10.0.0
+
+  # UI & Icons
+  google_fonts: ^8.1.0
+  lucide_icons: ^0.257.0
+  flutter_svg: ^2.0.10
+  device_info_plus: ^12.4.0
+  # Camera & Permissions
+  camera: ^0.12.0+1
+  permission_handler: ^12.0.1
+  image_picker: ^1.1.2
+  # Localization & Utils
+  intl: ^0.20.2
+  uuid: ^4.3.3
+  qr_flutter: ^4.1.0
+  image_gallery_saver_plus: ^4.0.1
+  path_provider: ^2.1.4
+  cached_network_image: ^3.4.0
+  local_auth: ^2.3.0
+  connectivity_plus: ^7.1.1
+  latlong2: any
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
+  url_launcher: ^6.2.5
+  screen_protector: ^1.5.1
+  webview_flutter: ^4.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.4.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.3.0
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo_premium.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/images/logo_premium.png"
+  adaptive_icon_foreground_inset: 12
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/images/logo_premium.png
+  android_12:
+    image: assets/images/logo_premium.png
+    color: "#ffffff"
+  fullscreen: false
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/images/providers/
