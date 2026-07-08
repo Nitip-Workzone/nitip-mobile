@@ -112,3 +112,7 @@ update:
 quiet-logs:
 	@echo "Silencing EGL_emulation logs on connected devices..."
 	@$(ADB) devices | grep -v "List" | grep "device$$" | cut -f1 | xargs -I {} $(ADB) -s {} shell setprop log.tag.EGL_emulation SILENT || echo "No devices found to silence."
+
+set-gps-lolak:
+	@echo "Setting emulator GPS coordinates to Desa Lolak (0.8811, 124.014)..."
+	@$(ADB) devices | grep emulator | cut -f1 | xargs -I {} $(ADB) -s {} emu geo fix 124.014 0.8811 || echo "No running emulator found."

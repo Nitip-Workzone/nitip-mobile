@@ -46,9 +46,6 @@ class LocationService {
       // Try to get last known position first for speed
       final lastPos = await Geolocator.getLastKnownPosition();
       if (lastPos != null) {
-        if (lastPos.isMocked) {
-          throw Exception("Fake GPS/Mock Location terdeteksi! Gunakan lokasi GPS asli Anda.");
-        }
         return LatLng(lastPos.latitude, lastPos.longitude);
       }
 
@@ -59,9 +56,6 @@ class LocationService {
           timeLimit: Duration(seconds: 5),
         ),
       );
-      if (position.isMocked) {
-        throw Exception("Fake GPS/Mock Location terdeteksi! Gunakan lokasi GPS asli Anda.");
-      }
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
       debugPrint("Error getting location: $e");

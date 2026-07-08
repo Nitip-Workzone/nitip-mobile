@@ -31,7 +31,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   
-  LatLng _currentCenter = const LatLng(-6.2000, 106.8166); // Default Jakarta
+  LatLng _currentCenter = const LatLng(0.8811, 124.014); // Default Lolak
   String _currentAddress = "Mencari alamat...";
   List<Map<String, dynamic>> _searchResults = [];
   bool _isLoading = false;
