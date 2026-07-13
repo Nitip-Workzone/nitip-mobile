@@ -9,7 +9,7 @@ AVD_NAME = Phone_p
 LOCAL_IP = $(shell hostname -I | awk '{print $$1}')
 
 
-.PHONY: help emu run dev doctor analyze clean update
+.PHONY: help emu run dev doctor analyze clean update build-apk build-aab build-android
 
 help:
 	@echo "Available commands:"
@@ -23,6 +23,11 @@ help:
 	@echo "  make clean     - Clean build artifacts (no-update)"
 	@echo "  make update    - Update Flutter SDK and dependencies"
 	@echo "  make quiet-logs - Silence noisy EGL emulation logs (Android)"
+	@echo ""
+	@echo "  Production Android Builds:"
+	@echo "  make build-apk      - Build production APK (release)"
+	@echo "  make build-aab      - Build production AAB (Play Store)"
+	@echo "  make build-android  - Same as build-aab (default production build)"
 
 emu:
 	@echo "Selecting emulator..."
@@ -116,3 +121,39 @@ quiet-logs:
 set-gps-lolak:
 	@echo "Setting emulator GPS coordinates to Desa Lolak (0.8811, 124.014)..."
 	@$(ADB) devices | grep emulator | cut -f1 | xargs -I {} $(ADB) -s {} emu geo fix 124.014 0.8811 || echo "No running emulator found."
+
+# ─────────────────────────────────────────────
+# Production Android Builds
+# Uses env.json for production configuration
+# ─────────────────────────────────────────────
+
+# Default production build target (AAB for Play Store)
+build-android: build-aab
+
+# Build production APK (sideload / direct install)
+build-apk:
+	@echo "🔨 Building Nitip APK (Production)..."
+	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
+	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
+	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
+	@echo ""
+	@rm -rf build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@$(FLUTTER) build apk --release --dart-define-from-file=env.json
+	@echo ""
+	@echo "✅ APK built successfully!"
+	@echo "📦 Output: build/app/outputs/flutter-apk/app-release.apk"
+	@ls -lh build/app/outputs/flutter-apk/app-release.apk 2>/dev/null || true
+
+# Build production AAB (Google Play Store)
+build-aab:
+	@echo "🔨 Building Nitip App Bundle (Production)..."
+	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
+	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
+	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
+	@echo ""
+	@rm -rf build/app/outputs/bundle/release/*.aab 2>/dev/null || true
+	@$(FLUTTER) build appbundle --release --dart-define-from-file=env.json
+	@echo ""
+	@echo "✅ App Bundle built successfully!"
+	@echo "📦 Output: build/app/outputs/bundle/release/app-release.aab"
+	@ls -lh build/app/outputs/bundle/release/app-release.aab 2>/dev/null || true
