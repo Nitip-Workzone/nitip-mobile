@@ -3,6 +3,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../data/network/api_client.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/models/user_model.dart';
@@ -112,6 +113,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         kycStatus: kycStatus,
         accessToken: token,
       );
+      requestNotificationPermission();
     } catch (e) {
       // Jika token tidak valid (401), hapus dari storage
       if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
@@ -163,6 +165,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accessToken: token,
       );
       
+      // Request notification permission & sync FCM token after successful login
+      requestNotificationPermission();
+
       // After login, check KYC status
       await checkAuthStatus();
     } catch (e) {
@@ -327,6 +332,61 @@ class AuthNotifier extends StateNotifier<AuthState> {
         error: e.toString().replaceAll('Exception: ', ''),
       );
       rethrow;
+    }
+  }
+
+  Future<void> requestNotificationPermission() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+
+      // Cek status notifikasi saat ini via Firebase
+      final currentSettings = await messaging.getNotificationSettings();
+      debugPrint('[NOTIF] Current authorization status: ${currentSettings.authorizationStatus}');
+
+      // Jika sudah authorized, langsung sync token
+      if (currentSettings.authorizationStatus == AuthorizationStatus.authorized) {
+        debugPrint('[NOTIF] Already authorized, syncing FCM token...');
+        await syncFcmToken();
+        return;
+      }
+
+      // Request permission menggunakan Firebase Messaging
+      // Ini menangani POST_NOTIFICATIONS di Android 13+ secara native
+      // dan APNS permission di iOS secara native
+      final settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+      debugPrint('[NOTIF] Permission request result: ${settings.authorizationStatus}');
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        debugPrint('[NOTIF] Permission granted, syncing FCM token...');
+        await syncFcmToken();
+      } else {
+        debugPrint('[NOTIF] Permission denied or not determined. Status: ${settings.authorizationStatus}');
+      }
+    } catch (e) {
+      debugPrint('[NOTIF] Failed to request notification permission: $e');
+    }
+  }
+
+  Future<void> syncFcmToken() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final token = await messaging.getToken();
+      if (token != null) {
+        debugPrint('[FCM] Syncing token with server...');
+        await _ref.read(apiClientProvider).dio.put('/users/fcm-token', data: {'fcm_token': token});
+        debugPrint('[FCM] Token synced successfully');
+      }
+    } catch (e) {
+      debugPrint('[FCM] Failed to sync token with server: $e');
     }
   }
 }

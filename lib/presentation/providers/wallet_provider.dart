@@ -91,7 +91,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     try {
       final tx = await _repository.initiateTopUp(amount);
       // Refresh balance (walaupun mungkin masih PENDING, agar sinkron dengan BE)
-      await fetchBalance();
+      await fetchBalance(force: true);
       return tx;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -104,7 +104,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     try {
       final tx = await _repository.getTransactionStatus(reference);
       // Sinkronkan balance jika status sudah berubah
-      await fetchBalance();
+      await fetchBalance(force: true);
       await fetchTransactions(); // Refresh list if we are on the transaction page
       state = state.copyWith(isLoading: false);
       return tx;
@@ -146,7 +146,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
         pin: pin,
         metadata: metadata,
       );
-      await fetchBalance();
+      await fetchBalance(force: true);
       await fetchTransactions();
       return tx;
     } catch (e) {

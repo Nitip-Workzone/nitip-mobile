@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -271,7 +270,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
                 ),
                 IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
+                  icon: const Icon(Icons.close, size: 20),
                   onPressed: () => Navigator.pop(context),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -303,7 +302,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                       ),
                       child: logoAsset != null
                           ? Image.asset(logoAsset, fit: BoxFit.contain)
-                          : Icon(ch.type == 'BANK' ? LucideIcons.landmark : LucideIcons.smartphone, color: primary),
+                          : Icon(ch.type == 'BANK' ? Icons.account_balance : Icons.smartphone, color: primary),
                     ),
                     title: Text(
                       ch.name,
@@ -322,8 +321,8 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                       ),
                     ),
                     trailing: isSelected
-                        ? Icon(LucideIcons.checkCircle2, color: primary, size: 20)
-                        : (isActive ? const Icon(LucideIcons.chevronRight, size: 16, color: Color(0xFFCBD5E1)) : null),
+                        ? Icon(Icons.check_circle, color: primary, size: 20)
+                        : (isActive ? const Icon(Icons.chevron_right, size: 16, color: Color(0xFFCBD5E1)) : null),
                     onTap: isActive
                         ? () {
                             setState(() {
@@ -360,7 +359,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(LucideIcons.chevronLeft, size: 24),
+          icon: const Icon(Icons.chevron_left, size: 24),
           onPressed: () => Navigator.pop(context),
           color: const Color(0xFF1E293B),
         ),
@@ -452,7 +451,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
                           ),
-                          child: const Icon(LucideIcons.wallet, color: Colors.white, size: 28),
+                          child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
                         ),
                       ],
                     ),
@@ -528,7 +527,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                   ),
                   if (_controller.text.isNotEmpty)
                     IconButton(
-                      icon: const Icon(LucideIcons.xCircle, color: Color(0xFF94A3B8), size: 20),
+                      icon: const Icon(Icons.cancel, color: Color(0xFF94A3B8), size: 20),
                       onPressed: () {
                         _controller.clear();
                         setState(() {
@@ -598,7 +597,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                           ),
                           child: _brandLogos[_selectedChannel!.code.toUpperCase()] != null
                               ? Image.asset(_brandLogos[_selectedChannel!.code.toUpperCase()]!, fit: BoxFit.contain)
-                              : Icon(LucideIcons.landmark, color: primary, size: 18),
+                              : Icon(Icons.account_balance, color: primary, size: 18),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -617,7 +616,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                           ),
                         ),
                       ] else ...[
-                        const Icon(LucideIcons.landmark, color: Color(0xFF94A3B8), size: 24),
+                        const Icon(Icons.account_balance, color: Color(0xFF94A3B8), size: 24),
                         const SizedBox(width: 16),
                         const Expanded(
                           child: Text(
@@ -626,7 +625,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                           ),
                         ),
                       ],
-                      const Icon(LucideIcons.chevronDown, color: Color(0xFF94A3B8), size: 20),
+                      const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 20),
                     ],
                   ),
                 ),
@@ -736,7 +735,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.alertCircle, color: Colors.red, size: 16),
+                    const Icon(Icons.error_outline, color: Colors.red, size: 16),
                     const SizedBox(width: 8),
                     Expanded(child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w700))),
                   ],

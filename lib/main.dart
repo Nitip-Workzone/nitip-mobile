@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/responsive.dart';
 
@@ -25,6 +26,8 @@ import 'presentation/pages/dashboard/tabs/orders_tab.dart';
 import 'presentation/pages/reviews/submit_review_page.dart';
 
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/wallet_provider.dart';
+import 'presentation/providers/notification_provider.dart';
 
 class AuthStatus {
   final bool isInitialized;
@@ -146,31 +149,156 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+// Top-level function to handle background messages
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('[FCM-BACKGROUND] Message received: ${message.data}');
+}
+
+// Local notification plugin instance
+final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+/// Initialize local notifications channel and plugin
+Future<void> _initLocalNotifications() async {
+  // Android channel
+  const androidChannel = AndroidNotificationChannel(
+    'nitip_high_importance', // id
+    'Nitip Notifications',   // name
+    description: 'Notifikasi penting dari Nitip',
+    importance: Importance.high,
+    playSound: true,
+  );
+
+  // Create the Android notification channel
+  final androidPlugin = _localNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  if (androidPlugin != null) {
+    await androidPlugin.createNotificationChannel(androidChannel);
+  }
+
+  // Initialize plugin
+  const initSettings = InitializationSettings(
+    android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+    iOS: DarwinInitializationSettings(
+      requestAlertPermission: false, // Handled by FirebaseMessaging
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    ),
+  );
+
+  await _localNotificationsPlugin.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: (details) {
+      debugPrint('[NOTIF-LOCAL] User tapped notification: ${details.payload}');
+      // Navigation can be handled here based on payload
+    },
+  );
+}
+
+/// Display a local notification (used when app is in foreground)
+void _showLocalNotification(RemoteMessage message) {
+  final notification = message.notification;
+  if (notification == null) return;
+
+  final androidDetails = AndroidNotificationDetails(
+    'nitip_high_importance',
+    'Nitip Notifications',
+    channelDescription: 'Notifikasi penting dari Nitip',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+    icon: '@mipmap/launcher_icon',
+  );
+
+  final details = NotificationDetails(
+    android: androidDetails,
+    iOS: const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+  );
+
+  _localNotificationsPlugin.show(
+    notification.hashCode,
+    notification.title,
+    notification.body,
+    details,
+    payload: message.data.toString(),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
   
+  // Register background message handler BEFORE Firebase init
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   try {
     await Firebase.initializeApp();
+    
+    // Initialize local notifications for foreground display
+    await _initLocalNotifications();
+
     final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(
-      alert: true,
-      announcement: false,
+    
+    // Foreground presentation options (iOS) — we handle display ourselves via local notifications
+    await messaging.setForegroundNotificationPresentationOptions(
+      alert: false,  // We use flutter_local_notifications instead
       badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
       sound: true,
     );
+
     final token = await messaging.getToken();
     debugPrint('[FCM] Device Token: $token');
   } catch (e) {
     debugPrint('[FCM] Initialization failed: $e');
   }
+
+  final container = ProviderContainer();
+
+  // 1. FOREGROUND: Listen to FCM messages when app is in foreground
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint('[FCM-FOREGROUND] Title: ${message.notification?.title}');
+    debugPrint('[FCM-FOREGROUND] Body: ${message.notification?.body}');
+    debugPrint('[FCM-FOREGROUND] Data: ${message.data}');
+
+    // Show local notification since app is in foreground
+    _showLocalNotification(message);
+
+    // Handle specific data types
+    if (message.data['type'] == 'wallet_update') {
+      debugPrint('[FCM-FOREGROUND] Triggering wallet balance refresh...');
+      container.read(walletProvider.notifier).fetchBalance(force: true);
+    }
+    
+    // Always refresh notification count
+    container.read(notificationProvider.notifier).fetchUnreadCount(force: true);
+  });
+
+  // 2. BACKGROUND (app open but backgrounded): User taps notification
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    debugPrint('[FCM-OPENED] User tapped notification: ${message.data}');
+    // Refresh notification list
+    container.read(notificationProvider.notifier).fetchNotifications();
+    // Navigation can be handled here (e.g., go to order detail)
+  });
+
+  // 3. TERMINATED: App opened from terminated state via notification
+  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+  if (initialMessage != null) {
+    debugPrint('[FCM-INITIAL] App opened from terminated via notification: ${initialMessage.data}');
+    // Delayed navigation after app is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      container.read(notificationProvider.notifier).fetchNotifications();
+    });
+  }
   
   runApp(
-    const ProviderScope(
-      child: NitipApp(),
+    UncontrolledProviderScope(
+      container: container,
+      child: const NitipApp(),
     ),
   );
 }

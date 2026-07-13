@@ -29,7 +29,6 @@ dependencies:
 
   # UI & Icons
   google_fonts: ^8.1.0
-  lucide_icons: ^0.257.0
   flutter_svg: ^2.0.10
   device_info_plus: ^12.4.0
   # Camera & Permissions
@@ -53,6 +52,7 @@ dependencies:
   webview_flutter: ^4.8.0
   firebase_core: ^3.2.0
   firebase_messaging: ^15.0.0
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:
