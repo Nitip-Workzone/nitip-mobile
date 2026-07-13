@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/responsive.dart';
 
@@ -148,6 +150,23 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
   
+  try {
+    await Firebase.initializeApp();
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    final token = await messaging.getToken();
+    debugPrint('[FCM] Device Token: $token');
+  } catch (e) {
+    debugPrint('[FCM] Initialization failed: $e');
+  }
   
   runApp(
     const ProviderScope(
