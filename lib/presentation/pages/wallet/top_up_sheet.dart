@@ -109,6 +109,10 @@ class _TopUpSheetState extends State<_TopUpSheet>
           Navigator.pop(context); // tutup sheet input
           // Tampilkan receipt jika ada data transaksi
           await showTopUpReceipt(context, tx);
+          // Setelah receipt ditutup (user sudah bayar QRIS atau close), refresh saldo
+          if (mounted) {
+            widget.ref.read(walletProvider.notifier).refreshAfterTransaction();
+          }
         } else {
           // Jika tx null, ambil error dari state notifier
           final walletState = widget.ref.read(walletProvider);

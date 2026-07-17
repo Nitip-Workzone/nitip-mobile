@@ -114,6 +114,11 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
+  Future<void> refreshAfterTransaction() async {
+    await fetchBalance(force: true);
+    await fetchTransactions();
+  }
+
   Future<String?> inquiryAccount({
     required String channelCode,
     required String accountNo,

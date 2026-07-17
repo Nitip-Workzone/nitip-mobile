@@ -214,7 +214,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void>? _refreshProfileFuture;
+
   Future<void> refreshProfile() async {
+    // Guard: skip if already refreshing
+    if (_refreshProfileFuture != null) return _refreshProfileFuture;
+
+    _refreshProfileFuture = _performRefreshProfile();
+    try {
+      await _refreshProfileFuture;
+    } finally {
+      _refreshProfileFuture = null;
+    }
+  }
+
+  Future<void> _performRefreshProfile() async {
     state = state.copyWith(isRefreshing: true);
     try {
       final user = await _repository.getMe();
