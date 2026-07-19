@@ -466,6 +466,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         const SizedBox(height: 8),
         _buildPaymentDetails(order, primary, isRunner),
         _buildUploadedImagesSection(order, primary),
+        _buildFeedbackSection(order, primary),
+        if (!isRunner && order.paymentStatus == 'unpaid' && order.paymentMethod == 'escrow' && order.paymentSource == 'qris')
+          _buildQRISPaymentSection(order, primary),
         const SizedBox(height: 20),
 
         if (!isRunner && order.completionCode != null && isDelivering)
@@ -589,6 +592,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                 const SizedBox(height: 16),
                 _buildPaymentDetails(order, primary, true),
                 _buildUploadedImagesSection(order, primary),
+                _buildFeedbackSection(order, primary),
               ] else ...[
                 _buildCollapsibleDetailsCard(order, primary),
               ],
@@ -1905,6 +1909,103 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
               : hasReceipt
                   ? buildThumb(order.receiptImageUrl!, 'Struk Belanja (Kwitansi)')
                   : buildThumb(order.deliveryImageUrl!, 'Bukti Penyerahan Barang'),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildFeedbackSection(OrderModel order, Color primary) {
+    if (order.feedbackRating == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        _buildSectionTitle('Ulasan Penitip'),
+        const SizedBox(height: 8),
+        _buildCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ...List.generate(5, (index) {
+                    final isSelected = index < order.feedbackRating!;
+                    return Icon(
+                      isSelected ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: isSelected ? Colors.amber : Colors.grey.shade300,
+                      size: 20,
+                    );
+                  }),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${order.feedbackRating}/5',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textMain),
+                  ),
+                ],
+              ),
+              if (order.feedbackComment != null && order.feedbackComment!.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  order.feedbackComment!,
+                  style: const TextStyle(fontSize: 13, color: AppColors.textMain, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildQRISPaymentSection(OrderModel order, Color primary) {
+    if (order.qrisData == null || order.qrisData!.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        _buildSectionTitle('Selesaikan Pembayaran QRIS'),
+        const SizedBox(height: 8),
+        _buildCard(
+          child: Column(
+            children: [
+              const Text(
+                'Silakan scan QRIS di bawah ini menggunakan aplikasi mobile banking atau e-wallet pilihan Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 20),
+              CachedNetworkImage(
+                imageUrl: order.qrisData!,
+                width: 200,
+                height: 200,
+                placeholder: (context, url) => const SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (context, url, error) => const SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: Center(child: Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Status: Menunggu Pembayaran',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.warning),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Setelah membayar, status pesanan Anda akan otomatis aktif.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
         ),
       ],
     );

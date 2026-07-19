@@ -41,6 +41,10 @@ class OrderModel {
   final double distanceKm;
 
   final String? completionCode;
+  final int? feedbackRating;
+  final String? feedbackComment;
+  final String paymentSource;
+  final String? qrisData;
 
   OrderModel({
     required this.id,
@@ -82,6 +86,10 @@ class OrderModel {
     this.pickupAddress,
     this.distanceKm = 0,
     this.completionCode,
+    this.feedbackRating,
+    this.feedbackComment,
+    this.paymentSource = 'wallet',
+    this.qrisData,
   });
 
   factory OrderModel.empty() {
@@ -98,6 +106,7 @@ class OrderModel {
       status: '',
       paymentStatus: '',
       paymentMethod: '',
+      paymentSource: 'wallet',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -148,6 +157,10 @@ class OrderModel {
       pickupAddress: json['pickup_address'],
       distanceKm: (json['distance_km'] ?? 0).toDouble(),
       completionCode: json['completion_code'],
+      feedbackRating: json['feedback_rating'],
+      feedbackComment: json['feedback_comment'],
+      paymentSource: json['payment_source'] ?? 'wallet',
+      qrisData: json['qris_data'],
     );
   }
 
@@ -196,6 +209,10 @@ class OrderModel {
       pickupAddress: pickupAddress,
       distanceKm: distanceKm,
       completionCode: completionCode ?? this.completionCode,
+      feedbackRating: feedbackRating,
+      feedbackComment: feedbackComment,
+      paymentSource: paymentSource,
+      qrisData: qrisData,
     );
   }
 
