@@ -40,10 +40,16 @@ class AppLogo extends StatelessWidget {
             ),
           ),
           child: Center(
-            child: Icon(
-              Icons.shopping_bag_rounded,
-              color: effectiveColor,
-              size: size * 0.75,
+            child: Image.asset(
+              darkMode ? 'assets/images/logo_white.png' : 'assets/images/logo_premium.png',
+              width: size * 1.2,
+              height: size * 1.2,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.shopping_bag_rounded,
+                color: effectiveColor,
+                size: size * 0.75,
+              ),
             ),
           ),
         ),

@@ -44,15 +44,6 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                 child: IntrinsicHeight(
                   child: Column(
                     children: [
-                      // ── Top Logo Bar ──────────────────────────────────────────────
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 20, 24, 0),
-                        child: AppLogo(
-                          size: 18,
-                          fontSize: 18,
-                        ),
-                      ),
-
                       // ── Illustration ──────────────────────────────────────────────
                       Expanded(
                         child: FadeTransition(
@@ -64,12 +55,12 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Illustration image
+                                  // Logo image
                                   Container(
                                     color: Colors.white,
-                                    height: 260,
+                                    height: 220,
                                     child: Image.asset(
-                                      'assets/images/welcome_illustration.png',
+                                      'assets/images/logo_premium.png',
                                       fit: BoxFit.contain,
                                       errorBuilder: (_, __, ___) => const Icon(
                                         Icons.shopping_bag_rounded,

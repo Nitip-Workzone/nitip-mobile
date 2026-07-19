@@ -101,7 +101,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     }
   }
 
-  Future<bool> purchaseOrder(String id, String receiptUrl) async {
+  Future<bool> purchaseOrder(String id, String receiptPath) async {
     // Optimistic Update
     final originalOrders = state.activeOrders;
     state = state.copyWith(
@@ -109,7 +109,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     );
 
     try {
-      await _orderRepo.purchaseOrder(id, receiptUrl);
+      await _orderRepo.purchaseOrder(id, receiptPath);
       await fetchActivities(force: true);
       return true;
     } catch (e) {
@@ -157,7 +157,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     }
   }
 
-  Future<bool> completeOrder(String id, String code, String imageUrl) async {
+  Future<bool> completeOrder(String id, String code, String imagePath) async {
     // Optimistic Update
     final originalOrders = state.activeOrders;
     state = state.copyWith(
@@ -165,7 +165,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     );
 
     try {
-      await _orderRepo.completeOrder(id, code, imageUrl);
+      await _orderRepo.completeOrder(id, code, imagePath);
       await fetchActivities(force: true);
       return true;
     } catch (e) {

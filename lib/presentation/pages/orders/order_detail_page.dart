@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -464,6 +465,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         _buildSectionTitle('Rincian Pembayaran'),
         const SizedBox(height: 8),
         _buildPaymentDetails(order, primary, isRunner),
+        _buildUploadedImagesSection(order, primary),
         const SizedBox(height: 20),
 
         if (!isRunner && order.completionCode != null && isDelivering)
@@ -586,6 +588,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                 _buildOrderInfoCard(order, primary),
                 const SizedBox(height: 16),
                 _buildPaymentDetails(order, primary, true),
+                _buildUploadedImagesSection(order, primary),
               ] else ...[
                 _buildCollapsibleDetailsCard(order, primary),
               ],
@@ -1252,6 +1255,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
               // C. Financial Details
               _buildPaymentDetails(order, primary, true),
+              _buildUploadedImagesSection(order, primary),
             ],
           ),
         ),
@@ -1789,6 +1793,124 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
 
 
+  Widget _buildUploadedImagesSection(OrderModel order, Color primary) {
+    final hasReceipt = order.receiptImageUrl != null && order.receiptImageUrl!.trim().isNotEmpty;
+    final hasDeliveryProof = order.deliveryImageUrl != null && order.deliveryImageUrl!.trim().isNotEmpty;
+
+    if (!hasReceipt && !hasDeliveryProof) return const SizedBox.shrink();
+
+    void openFullscreen(String url, String label) {
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.92),
+        builder: (_) => GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            ),
+            body: Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.8,
+                maxScale: 5.0,
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.contain,
+                  placeholder: (ctx, _) => const CircularProgressIndicator(color: Colors.white),
+                  errorWidget: (ctx, _, __) => const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 60),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget buildThumb(String url, String label) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => openFullscreen(url, label),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: CachedNetworkImage(
+                      imageUrl: url,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(child: Icon(Icons.broken_image_rounded, size: 28, color: Colors.grey)),
+                      ),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Fullscreen hint icon
+                Positioned(
+                  bottom: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.zoom_out_map_rounded, size: 13, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        _buildSectionTitle('Bukti Foto'),
+        const SizedBox(height: 8),
+        _buildCard(
+          child: hasReceipt && hasDeliveryProof
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: buildThumb(order.receiptImageUrl!, 'Struk Belanja')),
+                    const SizedBox(width: 10),
+                    Expanded(child: buildThumb(order.deliveryImageUrl!, 'Bukti Serah Terima')),
+                  ],
+                )
+              : hasReceipt
+                  ? buildThumb(order.receiptImageUrl!, 'Struk Belanja (Kwitansi)')
+                  : buildThumb(order.deliveryImageUrl!, 'Bukti Penyerahan Barang'),
+        ),
+      ],
+    );
+  }
+
+
   Widget _buildPaymentDetails(OrderModel order, Color primary, bool isRunner) {
     return _buildCard(
       child: Column(
@@ -1918,12 +2040,11 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   ? null
                   : () async {
                       if (formKey.currentState?.validate() ?? false) {
-                        final filename = selectedReceiptFile!.path.split('/').last;
-                        final receiptUrl = 'https://storage.nitip.id/receipts/$filename';
+                        final localPath = selectedReceiptFile!.path;
                         Navigator.pop(context);
 
                         setState(() => _isProcessing = true);
-                        final success = await ref.read(activityProvider.notifier).purchaseOrder(orderId, receiptUrl);
+                        final success = await ref.read(activityProvider.notifier).purchaseOrder(orderId, localPath);
                         setState(() => _isProcessing = false);
 
                         if (context.mounted) {
@@ -2038,18 +2159,13 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
               onPressed: () async {
                 if (formKey.currentState?.validate() ?? false) {
                   final code = codeController.text.trim();
-                  String imageUrl = '';
-                  
-                  if (selectedDeliveryFile != null) {
-                    final filename = selectedDeliveryFile!.path.split('/').last;
-                    imageUrl = 'https://storage.nitip.id/delivery/$filename';
-                  }
+                  final localPath = selectedDeliveryFile?.path ?? '';
 
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context); // Close the dialog
                   
                   setState(() => _isProcessing = true);
-                  final success = await ref.read(activityProvider.notifier).completeOrder(orderId, code, imageUrl);
+                  final success = await ref.read(activityProvider.notifier).completeOrder(orderId, code, localPath);
                   setState(() => _isProcessing = false);
 
                   if (success) {

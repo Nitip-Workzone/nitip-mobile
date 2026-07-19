@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../domain/models/order_model.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../network/api_client.dart';
@@ -64,10 +65,14 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<void> purchaseOrder(String id, String receiptUrl) async {
-    final response = await _apiClient.dio.post('/orders/$id/purchased', data: {
-      'receipt_url': receiptUrl,
+  Future<void> purchaseOrder(String id, String receiptPath) async {
+    final formData = FormData.fromMap({
+      'receipt': await MultipartFile.fromFile(
+        receiptPath,
+        filename: receiptPath.split('/').last,
+      ),
     });
+    final response = await _apiClient.dio.post('/orders/$id/purchased', data: formData);
     final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
     if (!apiResponse.success) throw Exception(apiResponse.message);
   }
@@ -97,11 +102,20 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<void> completeOrder(String id, String completionCode, String deliveryImageUrl) async {
-    final response = await _apiClient.dio.post('/orders/$id/complete', data: {
+  Future<void> completeOrder(String id, String completionCode, String deliveryImagePath) async {
+    final formData = FormData.fromMap({
       'completion_code': completionCode,
-      'delivery_image_url': deliveryImageUrl,
     });
+    if (deliveryImagePath.isNotEmpty) {
+      formData.files.add(MapEntry(
+        'delivery_image',
+        await MultipartFile.fromFile(
+          deliveryImagePath,
+          filename: deliveryImagePath.split('/').last,
+        ),
+      ));
+    }
+    final response = await _apiClient.dio.post('/orders/$id/complete', data: formData);
     final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
     if (!apiResponse.success) throw Exception(apiResponse.message);
   }

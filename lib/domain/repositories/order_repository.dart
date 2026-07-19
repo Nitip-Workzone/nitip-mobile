@@ -7,10 +7,10 @@ abstract class OrderRepository {
   Future<OrderModel> createOrder(Map<String, dynamic> data);
   Future<void> cancelOrder(String id);
   Future<void> acceptOrder(String id);
-  Future<void> purchaseOrder(String id, String receiptUrl);
+  Future<void> purchaseOrder(String id, String receiptPath);
   Future<void> adjustPrice(String id, double adjustedCost, String reason);
   Future<void> approveAdjustment(String id);
   Future<void> pickupOrder(String id);
-  Future<void> completeOrder(String id, String completionCode, String deliveryImageUrl);
+  Future<void> completeOrder(String id, String completionCode, String deliveryImagePath);
   Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data);
 }

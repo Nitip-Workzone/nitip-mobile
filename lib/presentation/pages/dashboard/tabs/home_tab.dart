@@ -238,7 +238,7 @@ class HomeTab extends ConsumerWidget {
                                 _TodayOrderList(
                                   activityState: activityState,
                                   primary: primary,
-                                  onTapOrder: (orderId) => context.push('/orders/$orderId'),
+                                  onTapOrder: (orderId) => context.push('/orders/detail/$orderId'),
                                 ),
                                 
                                 const SizedBox(height: 40),
