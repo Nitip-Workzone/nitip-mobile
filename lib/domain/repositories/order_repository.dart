@@ -1,7 +1,7 @@
 import '../models/order_model.dart';
 
 abstract class OrderRepository {
-  Future<List<OrderModel>> getMyOrders();
+  Future<List<OrderModel>> getMyOrders({int page = 1, int limit = 15});
   Future<List<OrderModel>> getAvailableOrders();
   Future<OrderModel> getOrderById(String id);
   Future<OrderModel> createOrder(Map<String, dynamic> data);

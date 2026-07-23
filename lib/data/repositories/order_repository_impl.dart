@@ -9,8 +9,11 @@ class OrderRepositoryImpl implements OrderRepository {
   OrderRepositoryImpl(this._apiClient);
 
   @override
-  Future<List<OrderModel>> getMyOrders() async {
-    final response = await _apiClient.dio.get('/orders/me');
+  Future<List<OrderModel>> getMyOrders({int page = 1, int limit = 15}) async {
+    final response = await _apiClient.dio.get(
+      '/orders/me',
+      queryParameters: {'page': page, 'limit': limit},
+    );
     final apiResponse = ApiResponse.fromJson(
       response.data,
       (data) => (data as List).map((e) => OrderModel.fromJson(e)).toList(),

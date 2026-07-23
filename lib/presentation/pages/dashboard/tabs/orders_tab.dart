@@ -14,12 +14,37 @@ class OrdersTab extends ConsumerStatefulWidget {
 }
 
 class _OrdersTabState extends ConsumerState<OrdersTab> {
+  final _activeScrollCtrl = ScrollController();
+  final _pastScrollCtrl = ScrollController();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(activityProvider.notifier).fetchActivities(force: true);
     });
+
+    _activeScrollCtrl.addListener(_onActiveScroll);
+    _pastScrollCtrl.addListener(_onPastScroll);
+  }
+
+  @override
+  void dispose() {
+    _activeScrollCtrl.dispose();
+    _pastScrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onActiveScroll() {
+    if (_activeScrollCtrl.position.pixels >= _activeScrollCtrl.position.maxScrollExtent - 150) {
+      ref.read(activityProvider.notifier).loadMore();
+    }
+  }
+
+  void _onPastScroll() {
+    if (_pastScrollCtrl.position.pixels >= _pastScrollCtrl.position.maxScrollExtent - 150) {
+      ref.read(activityProvider.notifier).loadMore();
+    }
   }
 
   @override
@@ -56,7 +81,7 @@ class _OrdersTabState extends ConsumerState<OrdersTab> {
             unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             tabs: [
               Tab(text: isRunner ? 'Tugas Aktif' : 'Aktif'),
-              Tab(text: 'Riwayat'),
+              const Tab(text: 'Riwayat'),
             ],
           ),
         ),
@@ -65,12 +90,12 @@ class _OrdersTabState extends ConsumerState<OrdersTab> {
             RefreshIndicator(
               onRefresh: () => ref.read(activityProvider.notifier).fetchActivities(force: true),
               color: primary,
-              child: _buildList(activityState.activeOrders, primary, activityState, true),
+              child: _buildList(activityState.activeOrders, primary, activityState, true, _activeScrollCtrl),
             ),
             RefreshIndicator(
               onRefresh: () => ref.read(activityProvider.notifier).fetchActivities(force: true),
               color: primary,
-              child: _buildList(activityState.pastOrders, primary, activityState, false),
+              child: _buildList(activityState.pastOrders, primary, activityState, false, _pastScrollCtrl),
             ),
           ],
         ),
@@ -78,19 +103,35 @@ class _OrdersTabState extends ConsumerState<OrdersTab> {
     );
   }
 
-  Widget _buildList(List<dynamic> items, Color primary, ActivityState state, bool isActiveTab) {
+  Widget _buildList(List<dynamic> items, Color primary, ActivityState state, bool isActiveTab, ScrollController scrollCtrl) {
     if (state.isLoading && !state.hasFetched) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (items.isEmpty) {
+    if (items.isEmpty && !state.isLoadingMore) {
       return _buildEmptyState(isActiveTab);
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: items.length,
+      controller: scrollCtrl,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      // +1 for loader indicator at the bottom
+      itemCount: items.length + (state.isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        // Load-more spinner at the bottom
+        if (index == items.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: primary),
+              ),
+            ),
+          );
+        }
+
         final item = items[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),

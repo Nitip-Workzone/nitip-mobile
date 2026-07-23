@@ -17,6 +17,9 @@ class WalletState {
   final WalletModel? wallet;
   final List<WalletTransactionModel> transactions;
   final bool hasFetched;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final int currentPage;
 
   WalletState({
     this.isLoading = false,
@@ -24,6 +27,9 @@ class WalletState {
     this.wallet,
     this.transactions = const [],
     this.hasFetched = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.currentPage = 1,
   });
 
   WalletState copyWith({
@@ -32,6 +38,9 @@ class WalletState {
     WalletModel? wallet,
     List<WalletTransactionModel>? transactions,
     bool? hasFetched,
+    bool? isLoadingMore,
+    bool? hasMore,
+    int? currentPage,
   }) {
     return WalletState(
       isLoading: isLoading ?? this.isLoading,
@@ -39,6 +48,9 @@ class WalletState {
       wallet: wallet ?? this.wallet,
       transactions: transactions ?? this.transactions,
       hasFetched: hasFetched ?? this.hasFetched,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
     );
   }
 }
@@ -46,6 +58,7 @@ class WalletState {
 // Notifier untuk Wallet
 class WalletNotifier extends StateNotifier<WalletState> {
   final WalletRepository _repository;
+  static const int _limit = 20;
 
   WalletNotifier(this._repository) : super(WalletState()) {
     // Otomatis fetch balance saat diinisialisasi
@@ -77,12 +90,35 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }
 
   Future<void> fetchTransactions() async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, error: null, currentPage: 1, transactions: []);
     try {
-      final transactions = await _repository.getTransactions();
-      state = state.copyWith(isLoading: false, transactions: transactions);
+      final transactions = await _repository.getTransactions(page: 1, limit: _limit);
+      state = state.copyWith(
+        isLoading: false,
+        transactions: transactions,
+        currentPage: 1,
+        hasMore: transactions.length == _limit,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> loadMoreTransactions() async {
+    if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
+
+    state = state.copyWith(isLoadingMore: true, error: null);
+    try {
+      final nextPage = state.currentPage + 1;
+      final more = await _repository.getTransactions(page: nextPage, limit: _limit);
+      state = state.copyWith(
+        isLoadingMore: false,
+        transactions: [...state.transactions, ...more],
+        currentPage: nextPage,
+        hasMore: more.length == _limit,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 

@@ -20,6 +20,7 @@ class TransactionHistoryPage extends ConsumerStatefulWidget {
 
 class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage> {
   String _selectedFilter = 'all'; // all, top_up, withdrawal, escrow
+  final _scrollCtrl = ScrollController();
 
   @override
   void initState() {
@@ -27,6 +28,23 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(walletProvider.notifier).fetchTransactions();
     });
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+      // Only load more if filter is 'all' — cursor only applies to unfiltered list
+      if (_selectedFilter == 'all') {
+        ref.read(walletProvider.notifier).loadMoreTransactions();
+      }
+    }
   }
 
   List<WalletTransactionModel> _filterTx(List<WalletTransactionModel> txs) {
@@ -248,58 +266,89 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
                   : filtered.isEmpty
                       ? _EmptyState(primary: primary)
                       : ListView(
+                          controller: _scrollCtrl,
                           padding: const EdgeInsets.only(bottom: 32),
                           physics: const AlwaysScrollableScrollPhysics(),
-                          children: grouped.entries.map((entry) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Tanggal group header
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                                  child: Text(
-                                    entry.key,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textMuted,
-                                      letterSpacing: 0.3,
+                          children: [
+                            ...grouped.entries.map((entry) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Tanggal group header
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                                    child: Text(
+                                      entry.key,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textMuted,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  // Items dalam group
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Column(
+                                      children: entry.value.asMap().entries.map((e) {
+                                        final isLast = e.key == entry.value.length - 1;
+                                        return Column(
+                                          children: [
+                                            _TransactionItem(
+                                              tx: e.value,
+                                              primary: primary,
+                                              onTap: () => showTopUpReceipt(context, e.value),
+                                            ),
+                                            if (!isLast)
+                                              const Divider(
+                                                height: 1,
+                                                indent: 68,
+                                                endIndent: 16,
+                                                color: AppColors.border,
+                                              ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                            // ── Load-more indicator ───────────────────────
+                            if (walletState.isLoadingMore)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: primary,
                                     ),
                                   ),
                                 ),
-                                // Items dalam group
-                                Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: Column(
-                                    children: entry.value.asMap().entries.map((e) {
-                                      final isLast = e.key == entry.value.length - 1;
-                                      return Column(
-                                        children: [
-                                          _TransactionItem(
-                                            tx: e.value,
-                                            primary: primary,
-                                            onTap: () => showTopUpReceipt(context, e.value),
-                                          ),
-                                          if (!isLast)
-                                            const Divider(
-                                              height: 1,
-                                              indent: 68,
-                                              endIndent: 16,
-                                              color: AppColors.border,
-                                            ),
-                                        ],
-                                      );
-                                    }).toList(),
+                              )
+                            else if (!walletState.hasMore && walletState.transactions.isNotEmpty && _selectedFilter == 'all')
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                child: Center(
+                                  child: Text(
+                                    'Semua transaksi telah ditampilkan',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textMuted.withValues(alpha: 0.7),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            );
-                          }).toList(),
+                              ),
+                          ],
                         ),
             ),
           ),

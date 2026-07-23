@@ -13,31 +13,46 @@ final orderRepositoryProvider = Provider<OrderRepository>((ref) {
 class ActivityState {
   final bool isLoading;
   final bool hasFetched;
+  final bool isLoadingMore;
+  final bool hasMore;
+  final int currentPage;
   final String? error;
   final List<OrderModel> activeOrders;
   final List<OrderModel> pastOrders;
+  final List<OrderModel> _allOrders;
 
   ActivityState({
     this.isLoading = false,
     this.hasFetched = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
+    this.currentPage = 1,
     this.error,
     this.activeOrders = const [],
     this.pastOrders = const [],
-  });
+    List<OrderModel> allOrders = const [],
+  }) : _allOrders = allOrders;
 
   ActivityState copyWith({
     bool? isLoading,
     bool? hasFetched,
+    bool? isLoadingMore,
+    bool? hasMore,
+    int? currentPage,
     String? error,
-    List<OrderModel>? activeOrders,
-    List<OrderModel>? pastOrders,
+    List<OrderModel>? allOrders,
   }) {
+    final orders = allOrders ?? _allOrders;
     return ActivityState(
       isLoading: isLoading ?? this.isLoading,
       hasFetched: hasFetched ?? this.hasFetched,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
       error: error,
-      activeOrders: activeOrders ?? this.activeOrders,
-      pastOrders: pastOrders ?? this.pastOrders,
+      activeOrders: orders.where((o) => o.isProcessing).toList(),
+      pastOrders: orders.where((o) => !o.isProcessing).toList(),
+      allOrders: orders,
     );
   }
 }
@@ -45,6 +60,7 @@ class ActivityState {
 class ActivityNotifier extends StateNotifier<ActivityState> {
   final OrderRepository _orderRepo;
   final Ref _ref;
+  static const int _limit = 15;
 
   ActivityNotifier(this._orderRepo, this._ref) : super(ActivityState());
 
@@ -58,7 +74,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   Future<void> fetchActivities({bool force = false}) async {
     final authState = _ref.read(authProvider);
     if (!authState.isAuthenticated || authState.user == null) return;
-    
+
     // 1. Skip if already fetched and not forced
     if (state.hasFetched && !force) return;
 
@@ -74,20 +90,38 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   }
 
   Future<void> _performFetch() async {
-    state = state.copyWith(isLoading: true, error: null);
-    
+    state = state.copyWith(isLoading: true, error: null, currentPage: 1, allOrders: []);
+
     try {
-      final orders = await _orderRepo.getMyOrders();
-      final activeOrders = orders.where((o) => o.isProcessing).toList();
-      final pastOrders = orders.where((o) => !o.isProcessing).toList();
+      final orders = await _orderRepo.getMyOrders(page: 1, limit: _limit);
       state = state.copyWith(
         isLoading: false,
         hasFetched: true,
-        activeOrders: activeOrders,
-        pastOrders: pastOrders,
+        currentPage: 1,
+        hasMore: orders.length == _limit,
+        allOrders: orders,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, hasFetched: true, error: e.toString());
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
+
+    state = state.copyWith(isLoadingMore: true, error: null);
+    try {
+      final nextPage = state.currentPage + 1;
+      final orders = await _orderRepo.getMyOrders(page: nextPage, limit: _limit);
+      final merged = [...state._allOrders, ...orders];
+      state = state.copyWith(
+        isLoadingMore: false,
+        currentPage: nextPage,
+        hasMore: orders.length == _limit,
+        allOrders: merged,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 
@@ -103,9 +137,9 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
 
   Future<bool> purchaseOrder(String id, String receiptPath) async {
     // Optimistic Update
-    final originalOrders = state.activeOrders;
+    final originalOrders = state._allOrders;
     state = state.copyWith(
-      activeOrders: state.activeOrders.map((o) => o.id == id ? o.copyWith(status: 'purchasing') : o).toList(),
+      allOrders: state._allOrders.map((o) => o.id == id ? o.copyWith(status: 'purchasing') : o).toList(),
     );
 
     try {
@@ -114,7 +148,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
       return true;
     } catch (e) {
       // Revert if failed
-      state = state.copyWith(activeOrders: originalOrders);
+      state = state.copyWith(allOrders: originalOrders);
       return false;
     }
   }
@@ -141,9 +175,9 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
 
   Future<bool> pickupOrder(String id) async {
     // Optimistic Update
-    final originalOrders = state.activeOrders;
+    final originalOrders = state._allOrders;
     state = state.copyWith(
-      activeOrders: state.activeOrders.map((o) => o.id == id ? o.copyWith(status: 'delivering') : o).toList(),
+      allOrders: state._allOrders.map((o) => o.id == id ? o.copyWith(status: 'delivering') : o).toList(),
     );
 
     try {
@@ -152,16 +186,16 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
       return true;
     } catch (e) {
       // Revert if failed
-      state = state.copyWith(activeOrders: originalOrders);
+      state = state.copyWith(allOrders: originalOrders);
       return false;
     }
   }
 
   Future<bool> completeOrder(String id, String code, String imagePath) async {
     // Optimistic Update
-    final originalOrders = state.activeOrders;
+    final originalOrders = state._allOrders;
     state = state.copyWith(
-      activeOrders: state.activeOrders.map((o) => o.id == id ? o.copyWith(status: 'completed') : o).toList(),
+      allOrders: state._allOrders.map((o) => o.id == id ? o.copyWith(status: 'completed') : o).toList(),
     );
 
     try {
@@ -171,7 +205,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     } catch (e) {
       debugPrint('DEBUG COMPLETE ORDER ERROR: $e');
       // Revert if failed
-      state = state.copyWith(activeOrders: originalOrders);
+      state = state.copyWith(allOrders: originalOrders);
       return false;
     }
   }
