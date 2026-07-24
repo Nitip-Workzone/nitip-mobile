@@ -255,10 +255,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text("Belum punya akun? ", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                                GestureDetector(
-                                  onTap: () => context.pushReplacement('/register'),
-                                  child: const Text('Daftar', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text(
+                                  "Pendaftaran Mitra hanya tersedia di PWA nitip.id",
+                                  style: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w500),
                                 ),
                               ],
                             ),

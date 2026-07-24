@@ -127,7 +127,7 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                                 width: double.infinity,
                                 height: 54,
                                 child: ElevatedButton(
-                                  onPressed: () => context.push('/register'),
+                                  onPressed: () => context.push('/login'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.primary,
                                     foregroundColor: Colors.white,
@@ -135,27 +135,16 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                   ),
                                   child: const Text(
-                                    'Mulai Sekarang',
+                                    'Masuk ke Akun',
                                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 54,
-                                child: OutlinedButton(
-                                  onPressed: () => context.push('/login'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
-                                    side: const BorderSide(color: AppColors.primary, width: 1.5),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  ),
-                                  child: const Text(
-                                    'Masuk ke Akun',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Pendaftaran Mitra & Penitip hanya dapat dilakukan melalui Web PWA nitip.id',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),

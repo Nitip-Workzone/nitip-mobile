@@ -611,7 +611,35 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     String statusLine;
     String actionLine;
 
-    if (isBeli) {
+    if (order.isFoodOrder) {
+      switch (order.status) {
+        case 'accepted':
+          icon = Icons.storefront_rounded;
+          statusLine = 'Menuju Merchant';
+          actionLine = 'Pergi ke merchant. Persiapan dimulai setelah Anda tiba.';
+          break;
+        case 'cooking':
+          icon = Icons.restaurant_menu_rounded;
+          statusLine = 'Dapur Sedang Memasak';
+          actionLine = 'Harap tunggu makanan disiapkan oleh merchant';
+          break;
+        case 'ready':
+          icon = Icons.storefront_rounded;
+          statusLine = 'Jemput Makanan';
+          actionLine = 'Makanan siap dijemput di merchant';
+          break;
+        case 'delivering':
+        case 'on_progress':
+          icon = Icons.electric_moped_rounded;
+          statusLine = 'Sedang Mengantar';
+          actionLine = 'Minta kode QR saat serah terima';
+          break;
+        default:
+          icon = Icons.check_circle_rounded;
+          statusLine = 'Selesai';
+          actionLine = 'Makanan berhasil diantarkan!';
+      }
+    } else if (isBeli) {
       switch (order.status) {
         case 'accepted':
           icon = Icons.storefront_rounded;
@@ -776,22 +804,42 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
   Widget _buildCompactProgressStrip(OrderModel order, Color primary) {
     final bool isBeli = order.serviceCategory == 'beli';
-    final List<({String label, IconData icon})> steps = isBeli
+    final List<({String label, IconData icon})> steps = order.isFoodOrder
         ? [
             (label: 'Terima', icon: Icons.check_rounded),
-            (label: 'Belanja', icon: Icons.shopping_cart_rounded),
+            (label: 'Masak', icon: Icons.restaurant_menu_rounded),
+            (label: 'Siap', icon: Icons.storefront_rounded),
             (label: 'Kirim', icon: Icons.electric_moped_rounded),
             (label: 'Selesai', icon: Icons.flag_rounded),
           ]
-        : [
-            (label: 'Terima', icon: Icons.check_rounded),
-            (label: 'Pickup', icon: Icons.hail_rounded),
-            (label: 'Kirim', icon: Icons.electric_moped_rounded),
-            (label: 'Selesai', icon: Icons.flag_rounded),
-          ];
+        : isBeli
+            ? [
+                (label: 'Terima', icon: Icons.check_rounded),
+                (label: 'Belanja', icon: Icons.shopping_cart_rounded),
+                (label: 'Kirim', icon: Icons.electric_moped_rounded),
+                (label: 'Selesai', icon: Icons.flag_rounded),
+              ]
+            : [
+                (label: 'Terima', icon: Icons.check_rounded),
+                (label: 'Pickup', icon: Icons.hail_rounded),
+                (label: 'Kirim', icon: Icons.electric_moped_rounded),
+                (label: 'Selesai', icon: Icons.flag_rounded),
+              ];
 
     int activeStep = 1; // "Terima" (index 0) is always completed in active mode
-    if (isBeli) {
+    if (order.isFoodOrder) {
+      if (order.status == 'accepted') {
+        activeStep = 1;
+      } else if (order.status == 'cooking') {
+        activeStep = 1;
+      } else if (order.status == 'ready') {
+        activeStep = 2;
+      } else if (order.status == 'delivering' || order.status == 'on_progress') {
+        activeStep = 3;
+      } else if (order.status == 'completed') {
+        activeStep = 4;
+      }
+    } else if (isBeli) {
       if (order.status == 'accepted') {
         activeStep = 1;
       } else if (order.status == 'purchasing') {
@@ -1599,6 +1647,34 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
             icon: Icons.check_circle_outline_rounded,
             color: AppColors.secondary,
             onPressed: () => _handleAccept(context, order.id),
+          ),
+        );
+      } else if (order.isFoodOrder && (order.status == 'accepted' || order.status == 'cooking')) {
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: null, // Disabled: wait for kitchen
+              icon: const Icon(Icons.hourglass_top_rounded, size: 20),
+              label: const Text('Menunggu Dapur Menyiapkan...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+        );
+      } else if (order.isFoodOrder && order.status == 'ready') {
+        return Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: _buildActionButton(
+            label: 'Jemput & Mulai Pengantaran',
+            icon: Icons.local_shipping_rounded,
+            color: primary,
+            onPressed: () => _handlePickup(context, order.id),
           ),
         );
       } else if (order.status == 'accepted') {

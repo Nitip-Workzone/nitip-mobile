@@ -22,19 +22,8 @@ class AppConfig {
   static bool get hasApiCredentials => apiKey.isNotEmpty && apiSecret.isNotEmpty;
 
   static String get webBaseUrl {
-    try {
-      final uri = Uri.parse(baseUrl);
-      if (uri.host == 'api.nihtip.com') {
-        return 'https://web.nihtip.com';
-      }
-      if (uri.host == '10.0.2.2') {
-        return 'http://10.0.2.2:3000';
-      }
-      // Map API host to web host (port 3000)
-      return '${uri.scheme}://${uri.host}:3000';
-    } catch (_) {
-      return 'http://localhost:3000';
-    }
+    // Android Emulator port redirection to localhost:3000 Nuxt
+    return 'http://10.0.2.2:3000';
   }
 
   static String get wsBaseUrl => baseUrl.replaceAll('http://', 'ws://').replaceAll('https://', 'wss://');

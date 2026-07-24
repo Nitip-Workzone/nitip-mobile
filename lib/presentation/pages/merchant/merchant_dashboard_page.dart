@@ -46,10 +46,12 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
   }
 
   void _initWebView(String token) {
-    // Memuat dashboard merchant langsung dengan token: /merchant/menu?token=$token
-    // URL ini akan ditangkap oleh middleware Nuxt di auth.global.ts untuk melakukan auto-login
-    final webUrl = '${AppConfig.webBaseUrl}/merchant/menu?token=$token';
-    debugPrint('[MerchantWebView] Loading: $webUrl');
+    // Memuat halaman jembatan (bridge) login awal
+    final bridgeUrl = '${AppConfig.webBaseUrl}/merchant/login';
+    debugPrint('[MerchantWebView] Initializing via bridge: $bridgeUrl');
+    
+    // Flag to ensure token is only injected once per initialization
+    bool tokenInjected = false;
 
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -64,17 +66,49 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
               });
             }
           },
-          onPageFinished: (String url) {
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
+          onPageFinished: (String url) async {
+            // Jika memuat halaman bridge login dan token belum di-inject
+            if (url.contains('/merchant/login') && !tokenInjected) {
+              tokenInjected = true;
+              debugPrint('[MerchantWebView] Page loaded. Injecting token into localStorage and cookies...');
+              
+              // Tulis ke localStorage dan Cookie
+              final jsScript = '''
+                (function() {
+                  try {
+                    // Set token ke localStorage
+                    localStorage.setItem('auth_token', '$token');
+                    
+                    // Set token ke cookies untuk SSR
+                    const maxAge = 60 * 60 * 24 * 7; // 7 hari
+                    document.cookie = "auth_token=$token; path=/; max-age=" + maxAge + "; SameSite=Lax";
+                    
+                    console.log('[WebView Mobile] LocalStorage and Cookie injected successfully.');
+                    
+                    // Redirect ke merchant menu utama
+                    window.location.href = '/merchant/menu';
+                  } catch (e) {
+                    console.error('[WebView Mobile] Failed to inject token:', e);
+                  }
+                })();
+              ''';
+              
+              await _webViewController?.runJavaScript(jsScript);
+            } else {
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
             }
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('[WebView Merchant Error] Code: ${error.errorCode}, Desc: ${error.description}');
-            if (error.description.contains('net::ERR_CACHE_MISS') ||
+            // Ignore cancel (-999), cache miss, and other non-terminal redirect status descriptions to avoid false error states
+            if (error.errorCode == -999 ||
+                error.description.contains('net::ERR_CACHE_MISS') ||
                 error.description.contains('Frame load interrupted') ||
+                error.description.contains('cache') ||
                 error.description.contains('ERR_UNKNOWN_URL_SCHEME')) {
               return;
             }
@@ -87,7 +121,7 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
           },
         ),
       )
-      ..loadRequest(Uri.parse(webUrl));
+      ..loadRequest(Uri.parse(bridgeUrl));
 
     if (mounted) {
       setState(() {

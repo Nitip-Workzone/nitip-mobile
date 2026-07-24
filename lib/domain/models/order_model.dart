@@ -39,6 +39,7 @@ class OrderModel {
   final String? pickupName;
   final String? pickupAddress;
   final double distanceKm;
+  final String? merchantId;
 
   final String? completionCode;
   final int? feedbackRating;
@@ -85,6 +86,7 @@ class OrderModel {
     this.pickupName,
     this.pickupAddress,
     this.distanceKm = 0,
+    this.merchantId,
     this.completionCode,
     this.feedbackRating,
     this.feedbackComment,
@@ -156,6 +158,7 @@ class OrderModel {
       pickupName: json['pickup_name'],
       pickupAddress: json['pickup_address'],
       distanceKm: (json['distance_km'] ?? 0).toDouble(),
+      merchantId: json['merchant_id'],
       completionCode: json['completion_code'],
       feedbackRating: json['feedback_rating'],
       feedbackComment: json['feedback_comment'],
@@ -208,6 +211,7 @@ class OrderModel {
       pickupName: pickupName,
       pickupAddress: pickupAddress,
       distanceKm: distanceKm,
+      merchantId: merchantId,
       completionCode: completionCode ?? this.completionCode,
       feedbackRating: feedbackRating,
       feedbackComment: feedbackComment,
@@ -229,4 +233,5 @@ class OrderModel {
   bool get isCancelled => status == 'cancelled';
   bool get isDisputed => status == 'disputed';
   bool get isProcessing => !isCompleted && !isCancelled && !isDisputed;
+  bool get isFoodOrder => merchantId != null && merchantId!.isNotEmpty;
 }
