@@ -130,4 +130,28 @@ class OrderRepositoryImpl implements OrderRepository {
     if (apiResponse.data == null) throw Exception(apiResponse.message);
     return apiResponse.data!;
   }
+
+  @override
+  Future<List<OrderModel>> getMerchantOrders() async {
+    final response = await _apiClient.dio.get('/orders/merchant/orders');
+    final apiResponse = ApiResponse.fromJson(
+      response.data,
+      (data) => (data as List).map((e) => OrderModel.fromJson(e)).toList(),
+    );
+    return apiResponse.data ?? [];
+  }
+
+  @override
+  Future<void> merchantAcceptOrder(String id) async {
+    final response = await _apiClient.dio.post('/orders/$id/merchant-accept');
+    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+    if (!apiResponse.success) throw Exception(apiResponse.message);
+  }
+
+  @override
+  Future<void> merchantReadyOrder(String id) async {
+    final response = await _apiClient.dio.post('/orders/$id/merchant-ready');
+    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+    if (!apiResponse.success) throw Exception(apiResponse.message);
+  }
 }

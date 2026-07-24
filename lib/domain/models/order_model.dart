@@ -220,9 +220,11 @@ class OrderModel {
   
   bool get isPending => status == 'pending';
   bool get isAccepted => status == 'accepted';
+  bool get isCooking => status == 'cooking';
+  bool get isReady => status == 'ready';
   bool get isPurchasing => status == 'purchasing';
   bool get isDelivering => status == 'delivering';
-  bool get isOnProgress => status == 'on_progress' || status == 'purchasing' || status == 'delivering';
+  bool get isOnProgress => status == 'on_progress' || status == 'purchasing' || status == 'delivering' || status == 'cooking' || status == 'ready';
   bool get isCompleted => status == 'completed';
   bool get isCancelled => status == 'cancelled';
   bool get isDisputed => status == 'disputed';

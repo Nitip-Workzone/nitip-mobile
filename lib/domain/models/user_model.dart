@@ -24,6 +24,7 @@ class User {
   bool get isRunner => role == 'runner';
   bool get isRequester => role == 'requester';
   bool get isPenitip => isRequester;
+  bool get isMerchant => role == 'merchant';
 
   User({
     required this.id,

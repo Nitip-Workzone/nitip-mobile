@@ -68,10 +68,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (next.error != null) {
         AppSnackBar.showError(context, next.error!);
       } else if (next.isAuthenticated && next.user != null) {
-        if (!next.user!.isRunner) {
+        // Requester-only: tolak masuk
+        if (!next.user!.isRunner && !next.user!.isMerchant) {
           AppSnackBar.showError(
             context,
-            'Aplikasi ini khusus untuk Runner. Bagi Penitip, silakan gunakan Web PWA kami di nitip.id.',
+            'Aplikasi ini khusus untuk Runner & Mitra Merchant. Bagi Penitip, silakan gunakan Web PWA kami di nitip.id.',
           );
           ref.read(authProvider.notifier).logout();
         } else {

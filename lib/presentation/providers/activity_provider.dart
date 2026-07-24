@@ -19,6 +19,7 @@ class ActivityState {
   final String? error;
   final List<OrderModel> activeOrders;
   final List<OrderModel> pastOrders;
+  final List<OrderModel> merchantOrders;
   final List<OrderModel> _allOrders;
 
   ActivityState({
@@ -30,6 +31,7 @@ class ActivityState {
     this.error,
     this.activeOrders = const [],
     this.pastOrders = const [],
+    this.merchantOrders = const [],
     List<OrderModel> allOrders = const [],
   }) : _allOrders = allOrders;
 
@@ -41,6 +43,7 @@ class ActivityState {
     int? currentPage,
     String? error,
     List<OrderModel>? allOrders,
+    List<OrderModel>? merchantOrders,
   }) {
     final orders = allOrders ?? _allOrders;
     return ActivityState(
@@ -52,6 +55,7 @@ class ActivityState {
       error: error,
       activeOrders: orders.where((o) => o.isProcessing).toList(),
       pastOrders: orders.where((o) => !o.isProcessing).toList(),
+      merchantOrders: merchantOrders ?? this.merchantOrders,
       allOrders: orders,
     );
   }
@@ -206,6 +210,39 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
       debugPrint('DEBUG COMPLETE ORDER ERROR: $e');
       // Revert if failed
       state = state.copyWith(allOrders: originalOrders);
+      return false;
+    }
+  }
+
+  Future<void> fetchMerchantOrders() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final orders = await _orderRepo.getMerchantOrders();
+      state = state.copyWith(
+        isLoading: false,
+        merchantOrders: orders,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<bool> merchantAccept(String id) async {
+    try {
+      await _orderRepo.merchantAcceptOrder(id);
+      await fetchMerchantOrders();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> merchantReady(String id) async {
+    try {
+      await _orderRepo.merchantReadyOrder(id);
+      await fetchMerchantOrders();
+      return true;
+    } catch (e) {
       return false;
     }
   }

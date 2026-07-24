@@ -170,19 +170,19 @@ class _SubmitReviewPageState extends ConsumerState<SubmitReviewPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
                   return Icon(
-                    index < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                    index < (review.runnerRating ?? 0) ? Icons.star_rounded : Icons.star_border_rounded,
                     size: 32,
-                    color: index < review.rating ? const Color(0xFFFBBF24) : AppColors.border,
+                    color: index < (review.runnerRating ?? 0) ? const Color(0xFFFBBF24) : AppColors.border,
                   );
                 }),
               ),
-              if (review.comment != null && review.comment!.isNotEmpty) ...[
+              if (review.runnerComment != null && review.runnerComment!.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-                  child: Text(review.comment!, style: const TextStyle(fontSize: 14, color: AppColors.textMain, height: 1.5)),
+                  child: Text(review.runnerComment!, style: const TextStyle(fontSize: 14, color: AppColors.textMain, height: 1.5)),
                 ),
               ],
               const SizedBox(height: 32),
@@ -204,7 +204,7 @@ class _SubmitReviewPageState extends ConsumerState<SubmitReviewPage> {
 
   Future<void> _handleSubmit() async {
     final comment = _commentController.text.trim();
-    final success = await ref.read(reviewProvider(widget.orderId).notifier).submitReview(widget.orderId, _rating, comment.isEmpty ? null : comment);
+    final success = await ref.read(reviewProvider(widget.orderId).notifier).submitRequesterReview(widget.orderId, _rating, comment.isEmpty ? null : comment);
 
     if (!mounted) return;
 

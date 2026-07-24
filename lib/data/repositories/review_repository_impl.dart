@@ -24,16 +24,16 @@ class ReviewRepositoryImpl implements ReviewRepository {
   }
 
   @override
-  Future<ReviewModel> submitReview(String orderId, int rating, String? comment) async {
+  Future<ReviewModel> submitRequesterReview(String orderId, int rating, String? comment) async {
     try {
       final body = <String, dynamic>{
-        'rating': rating,
+        'requester_rating': rating,
       };
       if (comment != null && comment.isNotEmpty) {
-        body['comment'] = comment;
+        body['requester_comment'] = comment;
       }
 
-      final response = await _apiClient.dio.post('/orders/$orderId/review', data: body);
+      final response = await _apiClient.dio.post('/orders/$orderId/runner-review', data: body);
 
       if (response.data['success'] == true && response.data['data'] != null) {
         return ReviewModel.fromJson(response.data['data']);

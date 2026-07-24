@@ -56,10 +56,10 @@ class ReviewNotifier extends StateNotifier<ReviewState> {
     }
   }
 
-  Future<bool> submitReview(String orderId, int rating, String? comment) async {
+  Future<bool> submitRequesterReview(String orderId, int rating, String? comment) async {
     state = state.copyWith(isSubmitting: true, error: null);
     try {
-      final review = await _repository.submitReview(orderId, rating, comment);
+      final review = await _repository.submitRequesterReview(orderId, rating, comment);
       state = state.copyWith(isSubmitting: false, review: review, submitted: true);
       return true;
     } catch (e) {

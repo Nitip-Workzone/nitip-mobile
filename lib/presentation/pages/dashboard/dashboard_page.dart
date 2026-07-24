@@ -17,6 +17,7 @@ import 'tabs/home_tab.dart';
 import 'tabs/wallet_tab.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/trips_tab.dart';
+import '../merchant/merchant_dashboard_page.dart';
 
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -30,8 +31,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    // Fetch user location and activities on first open
     Future.microtask(() {
+      if (!mounted) return;
       ref.read(userLocationProvider.notifier).updateLocation();
       ref.read(activityProvider.notifier).fetchActivities();
     });
@@ -43,16 +44,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     // Listen for auth state changes to trigger fetches when becoming authenticated
     ref.listen(authProvider, (previous, next) {
       if (next.isAuthenticated && (previous == null || !previous.isAuthenticated)) {
-        // Trigger all necessary fetches
         ref.read(walletProvider.notifier).fetchBalance();
         ref.read(notificationProvider.notifier).fetchUnreadCount();
         ref.read(activityProvider.notifier).fetchActivities();
       }
     });
 
-    // Enforce Runner-only role for MVP v2.0
-    const isRunner = true;
-    final primary = AppColors.secondary;
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isRunner = user?.isRunner ?? false;
+    final isMerchant = user?.isMerchant ?? false;
+
+    if (isMerchant) {
+      return const MerchantDashboardPage();
+    }
+
+    const primary = AppColors.secondary;
 
     const navItems = [
       _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Beranda'),
@@ -62,6 +69,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     ];
 
     final currentIndex = ref.watch(dashboardIndexProvider);
+    final adjustedIndex = currentIndex >= navItems.length ? 0 : currentIndex;
+
     final activityState = ref.watch(activityProvider);
     final activeOrdersCount = activityState.activeOrders.length;
 
@@ -70,94 +79,94 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: ConnectivityBanner(
-        child: IndexedStack(index: currentIndex, children: tabs),
+        child: IndexedStack(index: adjustedIndex, children: tabs),
       ),
       
-      // ── Dynamic Pulse Hub (Integrated QR & Active Orders) ──
-      floatingActionButton: _DynamicPulseHub(
-        activeOrdersCount: activeOrdersCount,
-        primary: primary,
-        onQrTap: () async {
-          final activeOrders = ref.read(activityProvider).activeOrders;
-          if (activeOrders.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Anda tidak memiliki pesanan aktif untuk diselesaikan.'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            return;
-          }
+      floatingActionButton: isRunner
+          ? _DynamicPulseHub(
+              activeOrdersCount: activeOrdersCount,
+              primary: primary,
+              onQrTap: () async {
+                final activeOrders = ref.read(activityProvider).activeOrders;
+                if (activeOrders.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Anda tidak memiliki pesanan aktif untuk diselesaikan.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
 
-          OrderModel? selectedOrder;
+                OrderModel? selectedOrder;
 
-          if (activeOrders.length == 1) {
-            selectedOrder = activeOrders.first;
-          } else {
-            // Show selection sheet if there are multiple active orders
-            selectedOrder = await showModalBottomSheet<OrderModel>(
-              context: context,
-              backgroundColor: Colors.transparent,
-              builder: (context) => _OrderSelectionSheet(
-                orders: activeOrders,
-                primaryColor: primary,
-              ),
-            );
-          }
+                if (activeOrders.length == 1) {
+                  selectedOrder = activeOrders.first;
+                } else {
+                  // Show selection sheet if there are multiple active orders
+                  selectedOrder = await showModalBottomSheet<OrderModel>(
+                    context: context,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => _OrderSelectionSheet(
+                      orders: activeOrders,
+                      primaryColor: primary,
+                    ),
+                  );
+                }
 
-          if (selectedOrder == null || !context.mounted) return;
+                if (selectedOrder == null || !context.mounted) return;
 
-          final expectedCode = selectedOrder.completionCode ?? '';
+                final expectedCode = selectedOrder.completionCode ?? '';
 
-          final scannedCode = await Navigator.push<String>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => QrScannerPage(expectedCode: expectedCode),
-            ),
-          );
+                final scannedCode = await Navigator.push<String>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => QrScannerPage(expectedCode: expectedCode),
+                  ),
+                );
 
-          if (scannedCode != null && context.mounted) {
-            // Complete the order
-            final success = await ref.read(activityProvider.notifier).completeOrder(
-              selectedOrder.id,
-              scannedCode,
-              '', // Empty delivery image URL for mock
-            );
+                if (scannedCode != null && context.mounted) {
+                  // Complete the order
+                  final success = await ref.read(activityProvider.notifier).completeOrder(
+                    selectedOrder.id,
+                    scannedCode,
+                    '', // Empty delivery image URL for mock
+                  );
 
-            if (success && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Pesanan #${selectedOrder.id.substring(0, 8)} berhasil diselesaikan!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Colors.green,
-                ),
-              );
-            } else if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Gagal menyelesaikan pesanan. Silakan coba lagi.'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-        },
-        onOrdersTap: () {
-          final activeOrders = ref.read(activityProvider).activeOrders;
-          if (activeOrders.isNotEmpty) {
-            if (activeOrders.length == 1) {
-              context.push('/orders/detail/${activeOrders.first.id}');
-            } else {
-              context.push('/orders/active');
-            }
-          }
-        },
-
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+                  if (success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Pesanan #${selectedOrder.id.substring(0, 8)} berhasil diselesaikan!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Gagal menyelesaikan pesanan. Silakan coba lagi.'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              onOrdersTap: () {
+                final activeOrders = ref.read(activityProvider).activeOrders;
+                if (activeOrders.isNotEmpty) {
+                  if (activeOrders.length == 1) {
+                    context.push('/orders/detail/${activeOrders.first.id}');
+                  } else {
+                    context.push('/orders/active');
+                  }
+                }
+              },
+            )
+          : null,
+      floatingActionButtonLocation: isRunner ? FloatingActionButtonLocation.centerDocked : null,
       bottomNavigationBar: _CustomNavBar(
-        currentIndex: currentIndex,
+        currentIndex: adjustedIndex,
         onTap: (i) => ref.read(dashboardIndexProvider.notifier).state = i,
         items: navItems,
         activeColor: primary,
@@ -362,16 +371,8 @@ class _CustomNavBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: isRunner ? MainAxisAlignment.spaceBetween : MainAxisAlignment.spaceAround,
             children: [
-              // Left items
-              _buildNavItem(0),
-              _buildNavItem(1),
-              
-              // Spacer for FAB (hanya muncul jika runner)
-              if (isRunner) const SizedBox(width: 48),
-              
-              // Right items
-              _buildNavItem(2),
-              _buildNavItem(3),
+              if (isRunner) ..._buildRunnerNavItems()
+              else ...List.generate(items.length, (i) => _buildNavItem(i)),
             ],
           ),
         ),
@@ -379,7 +380,19 @@ class _CustomNavBar extends StatelessWidget {
     );
   }
 
+  /// Runner-specific layout: 4 items with FAB spacer in the middle
+  List<Widget> _buildRunnerNavItems() {
+    return [
+      _buildNavItem(0),
+      _buildNavItem(1),
+      const SizedBox(width: 48), // Spacer for FAB
+      _buildNavItem(2),
+      _buildNavItem(3),
+    ];
+  }
+
   Widget _buildNavItem(int index) {
+    if (index >= items.length) return const SizedBox.shrink();
     final item = items[index];
     final isActive = index == currentIndex;
 
@@ -388,9 +401,9 @@ class _CustomNavBar extends StatelessWidget {
         onTap: () => onTap(index),
         behavior: HitTestBehavior.opaque,
         child: SizedBox(
-          width: isRunner 
-              ? (MediaQuery.of(context).size.width - 100) / 4 
-              : MediaQuery.of(context).size.width / 4.5, // Adjust width based on role
+          width: isRunner
+              ? (MediaQuery.of(context).size.width - 100) / 4
+              : MediaQuery.of(context).size.width / (items.length + 1.5),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
