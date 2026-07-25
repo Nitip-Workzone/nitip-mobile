@@ -2402,12 +2402,12 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _getStatusTitle(order.status, isRunner),
+                      _getStatusTitle(order.status, isRunner, order.isFoodOrder),
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primary),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _getStatusDesc(order.status, isRunner),
+                      _getStatusDesc(order.status, isRunner, order.isFoodOrder),
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
                   ],
@@ -2554,10 +2554,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     );
   }
 
-  String _getStatusTitle(String status, bool isRunner) {
+  String _getStatusTitle(String status, bool isRunner, bool isFoodOrder) {
     switch (status.toLowerCase()) {
-      case 'pending': return isRunner ? 'Tugas Baru Tersedia' : 'Menunggu Runner';
-      case 'accepted': return isRunner ? 'Tugas Diterima' : 'Pesanan Diterima';
+      case 'pending': return isRunner ? 'Tugas Baru Tersedia' : (isFoodOrder ? 'Menunggu Dapur Menerima' : 'Menunggu Runner');
+      case 'accepted': return isRunner ? 'Tugas Diterima' : (isFoodOrder ? 'Pesanan Diterima Dapur' : 'Pesanan Diterima');
       case 'purchasing': return isRunner ? 'Sedang Belanja' : 'Sedang Dibeli';
       case 'delivering': return isRunner ? 'Dalam Pengantaran' : 'Dalam Pengantaran';
       case 'on_progress': return isRunner ? 'Dalam Pengerjaan' : 'Sedang Diproses';
@@ -2567,10 +2567,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     }
   }
 
-  String _getStatusDesc(String status, bool isRunner) {
+  String _getStatusDesc(String status, bool isRunner, bool isFoodOrder) {
     switch (status.toLowerCase()) {
-      case 'pending': return isRunner ? 'Ambil tugas ini segera sebelum diambil Runner lain.' : 'Pesanan Anda sedang dicarikan Runner terdekat.';
-      case 'accepted': return isRunner ? 'Anda telah menyetujui untuk menjalankan tugas ini.' : 'Runner telah menyetujui pesanan Anda.';
+      case 'pending': return isRunner ? 'Ambil tugas ini segera sebelum diambil Runner lain.' : (isFoodOrder ? 'Pesanan Anda sedang menunggu konfirmasi dari pihak dapur.' : 'Pesanan Anda sedang dicarikan Runner terdekat.');
+      case 'accepted': return isRunner ? 'Anda telah menyetujui untuk menjalankan tugas ini.' : (isFoodOrder ? 'Pesanan Anda telah disetujui dapur. Sistem sedang mencari runner terdekat.' : 'Runner telah menyetujui pesanan Anda.');
       case 'purchasing': return isRunner ? 'Anda sedang membelikan barang pesanan.' : 'Runner sedang membelikan barang pesanan Anda.';
       case 'delivering': return isRunner ? 'Anda sedang mengantarkan barang ke tujuan.' : 'Runner sedang mengantarkan barang ke lokasi Anda.';
       case 'on_progress': return isRunner ? 'Anda sedang menuju lokasi atau mengantar barang.' : 'Runner sedang menuju lokasi atau mengantar barang.';
