@@ -41,7 +41,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   /// - accepted/purchasing: origin = runner location, dest = pickup (go to store)
   /// - delivering/on_progress: origin = runner location, dest = delivery (go to customer)
   void _initOrderWebView(OrderModel order, {double? runnerLat, double? runnerLng}) {
-    final isDelivering = order.status == 'delivering' || order.status == 'on_progress';
+    final isDelivering = order.status == 'delivering';
 
     final queryParams = <String, String>{};
 
@@ -94,12 +94,13 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   /// Reload map when order status changes (e.g. accepted → delivering)
   void _reloadMapIfNeeded(OrderModel order, {double? runnerLat, double? runnerLng}) {
     if (_lastMapStatus != null && _lastMapStatus != order.status) {
-      // Status changed — re-initialize WebView with new coordinates
-      setState(() {
-        _mapWebViewController = null;
-        _isMapLoading = true;
-        _hasMapError = false;
-      });
+      // Status changed — reset state variables synchronously.
+      // This is safe since it runs during the build cycle, and the null check 
+      // on _mapWebViewController below will immediately trigger re-initialization.
+      _lastMapStatus = order.status;
+      _mapWebViewController = null;
+      _isMapLoading = true;
+      _hasMapError = false;
     }
   }
 
@@ -352,11 +353,48 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     );
 
     if (order.id.isEmpty) {
+      // Jika salah satu provider sedang mengambil data atau belum pernah mengambil data,
+      // tampilkan loading indicator (bukan layar error "tidak ditemukan")
+      if (activityState.isLoading || exploreState.isLoading || !activityState.hasFetched) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: const Text('Detail Pesanan', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain)),
+            centerTitle: true,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: AppColors.textMain),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 16),
+                Text(
+                  'Memuat detail pesanan...',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       return Scaffold(
+        backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('Detail Pesanan', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Detail Pesanan', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain)),
           centerTitle: true,
+          backgroundColor: Colors.white,
           elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textMain),
+            onPressed: () => context.pop(),
+          ),
         ),
         body: Center(
           child: Column(
@@ -364,15 +402,16 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
             children: [
               const Icon(Icons.error_outline, size: 64, color: AppColors.textMuted),
               const SizedBox(height: 16),
-              const Text('Pesanan tidak ditemukan atau telah selesai.'),
+              const Text('Pesanan tidak ditemukan atau telah selesai.', style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.w500)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => context.pop(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                child: const Text('Kembali ke Dashboard', style: TextStyle(color: Colors.white)),
+                child: const Text('Kembali ke Dashboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -425,7 +464,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   }
 
   Widget _buildPreviewLayout(OrderModel order, Color primary, bool isRunner) {
-    final isDelivering = order.status == 'delivering' || order.status == 'on_progress' || order.status == 'picked_up';
+    final isDelivering = order.status == 'delivering';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       children: [
@@ -2267,114 +2306,146 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Konfirmasi Selesai'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Scan QR pada aplikasi Penitip atau masukkan kode konfirmasi di bawah ini:'),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: codeController,
-                    decoration: InputDecoration(
-                      labelText: 'Kode Konfirmasi',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary),
-                        tooltip: 'Scan QR Code',
-                        onPressed: () async {
-                          final scannedCode = await Navigator.push<String>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => QrScannerPage(expectedCode: expectedCode),
-                            ),
-                          );
-                          if (scannedCode != null) {
-                            codeController.text = scannedCode;
-                            _showSnackBar('Kode Konfirmasi berhasil dipindai!');
-                          }
-                        },
+      builder: (context) {
+        bool isSubmitting = false;
+        String? errorMessage;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Konfirmasi Selesai'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Scan QR pada aplikasi Penitip atau masukkan kode konfirmasi di bawah ini:'),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: codeController,
+                      decoration: InputDecoration(
+                        labelText: 'Kode Konfirmasi',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary),
+                          tooltip: 'Scan QR Code',
+                          onPressed: () async {
+                            final scannedCode = await Navigator.push<String>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => QrScannerPage(expectedCode: expectedCode),
+                              ),
+                            );
+                            if (scannedCode != null) {
+                              codeController.text = scannedCode;
+                              _showSnackBar('Kode Konfirmasi berhasil dipindai!');
+                            }
+                          },
+                        ),
                       ),
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Kode wajib diisi';
+                        return null;
+                      },
+                      autofocus: true,
+                      enabled: !isSubmitting,
                     ),
-                    validator: (val) {
-                      if (val == null || val.isEmpty) return 'Kode wajib diisi';
-                      return null;
-                    },
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Foto bukti penyerahan barang (Opsional):',
-                    style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildImageSelector(
-                    selectedFile: selectedDeliveryFile,
-                    placeholderText: 'Pilih Foto Bukti Penyerahan',
-                    onTap: () async {
-                      final file = await _pickImage(context);
-                      if (file != null) {
-                        setDialogState(() => selectedDeliveryFile = file);
-                      }
-                    },
-                    onClear: () {
-                      setDialogState(() => selectedDeliveryFile = null);
-                    },
-                  ),
-                ],
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: AppColors.error, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Foto bukti penyerahan barang (Opsional):',
+                      style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildImageSelector(
+                      selectedFile: selectedDeliveryFile,
+                      placeholderText: 'Pilih Foto Bukti Penyerahan',
+                      onTap: isSubmitting
+                          ? () {}
+                          : () async {
+                              final file = await _pickImage(context);
+                              if (file != null) {
+                                setDialogState(() => selectedDeliveryFile = file);
+                              }
+                            },
+                      onClear: isSubmitting
+                          ? () {}
+                          : () {
+                              setDialogState(() => selectedDeliveryFile = null);
+                            },
+                    ),
+                  ],
+                ),
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context), 
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (formKey.currentState?.validate() ?? false) {
+                          final code = codeController.text.trim();
+                          final localPath = selectedDeliveryFile?.path ?? '';
+
+                          setDialogState(() {
+                            isSubmitting = true;
+                            errorMessage = null;
+                          });
+                          
+                          final success = await ref.read(activityProvider.notifier).completeOrder(orderId, code, localPath);
+
+                          if (success) {
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close the dialog
+                            }
+                            _showSnackBar('Pesanan Selesai! Pendapatan telah ditambahkan ke dompet Anda.');
+                          } else {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              errorMessage = 'Kode konfirmasi salah atau gagal memproses penyelesaian.';
+                            });
+                          }
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Konfirmasi'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  final code = codeController.text.trim();
-                  final localPath = selectedDeliveryFile?.path ?? '';
-
-                  final messenger = ScaffoldMessenger.of(context);
-                  Navigator.pop(context); // Close the dialog
-                  
-                  setState(() => _isProcessing = true);
-                  final success = await ref.read(activityProvider.notifier).completeOrder(orderId, code, localPath);
-                  setState(() => _isProcessing = false);
-
-                  if (success) {
-                    if (context.mounted) {
-                      context.pop(); // Return to previous screen
-                    }
-                    messenger.hideCurrentSnackBar();
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: const Text(
-                          'Pesanan Selesai! Pendapatan telah ditambahkan ke dompet Anda.',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
-                        ),
-                        backgroundColor: AppColors.success,
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
-                  } else {
-                    if (context.mounted) {
-                      _showSnackBar('Kode konfirmasi salah atau gagal menyelesaikan pesanan', isError: true);
-                    }
-                  }
-                }
-              },
-              child: const Text('Konfirmasi'),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../../providers/auth_provider.dart';
@@ -46,14 +49,96 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
   }
 
   void _initWebView(String token) {
-    // Memuat halaman jembatan (bridge) login awal
-    final bridgeUrl = '${AppConfig.webBaseUrl}/merchant/login';
+    // PENTING: Gunakan token sebagai query parameter langsung ke halaman merchant/login
+    // Middleware auth.global.ts di Nuxt sudah menangani ?token= untuk auto-login
+    final bridgeUrl = Uri.parse('${AppConfig.webBaseUrl}/merchant/login')
+        .replace(queryParameters: {'token': token});
     debugPrint('[MerchantWebView] Initializing via bridge: $bridgeUrl');
-    
-    // Flag to ensure token is only injected once per initialization
-    bool tokenInjected = false;
 
-    final controller = WebViewController()
+    // Inisialisasi controller terlebih dahulu dan assign ke field kelas,
+    // agar bisa direferensikan di dalam closure NavigationDelegate.
+    final newController = WebViewController(
+      onPermissionRequest: (WebViewPermissionRequest request) {
+        debugPrint('[MerchantWebView] Granting webview permission request');
+        request.grant();
+      },
+    );
+    _webViewController = newController;
+
+    // Cek jika platform adalah Android, aktifkan handler file chooser untuk <input type="file">
+    if (newController.platform is AndroidWebViewController) {
+      final androidController = newController.platform as AndroidWebViewController;
+      androidController.setOnShowFileSelector((FileSelectorParams params) async {
+        try {
+          // Tampilkan dialog/bottom sheet untuk memilih Kamera atau Galeri
+          final ImageSource? source = await showModalBottomSheet<ImageSource>(
+            context: context,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (BuildContext context) {
+              return SafeArea(
+                child: Wrap(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Pilih Sumber Gambar',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textMain),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+                      title: const Text('Pilih dari Galeri'),
+                      onTap: () => Navigator.pop(context, ImageSource.gallery),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+                      title: const Text('Ambil Foto (Kamera)'),
+                      onTap: () => Navigator.pop(context, ImageSource.camera),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+
+          if (source == null) return [];
+
+          // Request izin kamera jika memilih kamera
+          if (source == ImageSource.camera) {
+            final permission = await Permission.camera.request();
+            if (!permission.isGranted) {
+              debugPrint('[MerchantWebView] Camera permission denied');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Izin akses kamera ditolak. Silakan berikan izin di pengaturan perangkat Anda.')),
+                );
+              }
+              return [];
+            }
+          }
+
+          final ImagePicker picker = ImagePicker();
+          final XFile? image = await picker.pickImage(
+            source: source,
+            maxWidth: 1024,
+            maxHeight: 1024,
+            imageQuality: 85,
+          );
+          if (image != null) {
+            final fileUri = Uri.file(image.path).toString();
+            debugPrint('[MerchantWebView] Selected image URI: $fileUri');
+            return [fileUri];
+          }
+        } catch (e) {
+          debugPrint('[MerchantWebView] Error picking image: $e');
+        }
+        return [];
+      });
+    }
+
+    newController
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
@@ -67,44 +152,33 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
             }
           },
           onPageFinished: (String url) async {
-            // Jika memuat halaman bridge login dan token belum di-inject
-            if (url.contains('/merchant/login') && !tokenInjected) {
-              tokenInjected = true;
-              debugPrint('[MerchantWebView] Page loaded. Injecting token into localStorage and cookies...');
-              
-              // Tulis ke localStorage dan Cookie
-              final jsScript = '''
-                (function() {
-                  try {
-                    // Set token ke localStorage
-                    localStorage.setItem('auth_token', '$token');
-                    
-                    // Set token ke cookies untuk SSR
-                    const maxAge = 60 * 60 * 24 * 7; // 7 hari
-                    document.cookie = "auth_token=$token; path=/; max-age=" + maxAge + "; SameSite=Lax";
-                    
-                    console.log('[WebView Mobile] LocalStorage and Cookie injected successfully.');
-                    
-                    // Redirect ke merchant menu utama
-                    window.location.href = '/merchant/menu';
-                  } catch (e) {
-                    console.error('[WebView Mobile] Failed to inject token:', e);
-                  }
-                })();
-              ''';
-              
-              await _webViewController?.runJavaScript(jsScript);
-            } else {
-              if (mounted) {
-                setState(() {
-                  _isLoading = false;
-                });
-              }
+            debugPrint('[MerchantWebView] Page finished: $url');
+
+            // Unregister semua Service Worker PWA agar tidak mengintervensi
+            // navigasi & routing internal. WebView mobile tidak perlu PWA caching.
+            const unregisterSW = '''
+              (function() {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (let reg of registrations) {
+                      reg.unregister();
+                      console.log('[WebView Mobile] Service Worker unregistered:', reg.scope);
+                    }
+                  });
+                }
+              })();
+            ''';
+            // Gunakan _webViewController (field kelas) bukan local variable
+            await _webViewController?.runJavaScript(unregisterSW);
+
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
             }
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('[WebView Merchant Error] Code: ${error.errorCode}, Desc: ${error.description}');
-            // Ignore cancel (-999), cache miss, and other non-terminal redirect status descriptions to avoid false error states
             if (error.errorCode == -999 ||
                 error.description.contains('net::ERR_CACHE_MISS') ||
                 error.description.contains('Frame load interrupted') ||
@@ -121,16 +195,17 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
           },
         ),
       )
-      ..loadRequest(Uri.parse(bridgeUrl));
+      ..loadRequest(bridgeUrl);
 
     if (mounted) {
       setState(() {
-        _webViewController = controller;
         _isLoading = true;
         _hasError = false;
       });
     }
   }
+
+
 
   void _reload() {
     _loadedToken = null;
@@ -226,11 +301,13 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
               icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
               tooltip: 'Muat Ulang',
               onPressed: _reload,
+              focusNode: FocusNode(skipTraversal: true),
             ),
             IconButton(
               icon: const Icon(Icons.logout_rounded, color: AppColors.error),
               tooltip: 'Keluar',
               onPressed: _handleLogout,
+              focusNode: FocusNode(skipTraversal: true),
             ),
           ],
           bottom: PreferredSize(

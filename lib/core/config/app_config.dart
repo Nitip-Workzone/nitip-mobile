@@ -21,9 +21,17 @@ class AppConfig {
   /// Cek apakah API credentials sudah dikonfigurasi
   static bool get hasApiCredentials => apiKey.isNotEmpty && apiSecret.isNotEmpty;
 
+  static const String _webBaseUrlEnv = String.fromEnvironment(
+    'WEB_BASE_URL',
+    defaultValue: '',
+  );
+
   static String get webBaseUrl {
-    // Android Emulator port redirection to localhost:3000 Nuxt
-    return 'http://10.0.2.2:3000';
+    if (_webBaseUrlEnv.isNotEmpty) {
+      return _webBaseUrlEnv;
+    }
+    // Android Emulator port redirection to localhost:3000 Nuxt in dev, otherwise production URL
+    return isDev ? 'http://10.0.2.2:3000' : 'https://web.nihtip.com';
   }
 
   static String get wsBaseUrl => baseUrl.replaceAll('http://', 'ws://').replaceAll('https://', 'wss://');
