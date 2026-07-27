@@ -71,8 +71,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Jika sudah login tapi masih di halaman auth, lempar ke dashboard
       if (isAuth && isLoggingIn) return '/dashboard';
       
-      // Jika belum login dan mencoba akses dashboard, lempar ke welcome
-      if (!isAuth && state.matchedLocation == '/dashboard') return '/';
+      // Jika belum login dan mencoba akses route terlindungi (termasuk merchant via /dashboard), lempar ke welcome
+      // Sebelumnya hanya cek '/dashboard' exact, sekarang semua route kecuali public harus ke '/'
+      const publicRoutes = ['/', '/login', '/register', '/kyc-intro', '/kyc-benefits'];
+      final isPublic = publicRoutes.contains(state.matchedLocation) || state.matchedLocation.startsWith('/login') || state.matchedLocation.startsWith('/register');
+      if (!isAuth && !isPublic) {
+        return '/';
+      }
 
       return null;
     },

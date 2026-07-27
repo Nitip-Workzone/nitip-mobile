@@ -20,6 +20,7 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
   bool _isLoading = true;
   bool _hasError = false;
   String? _loadedToken;
+  bool _isHandlingSessionExpired = false;
 
   @override
   void initState() {
@@ -34,11 +35,12 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
     final token = authState.accessToken;
 
     if (token == null || token.isEmpty) {
-      debugPrint('[MerchantWebView] No token available, skipping init');
+      debugPrint('[MerchantWebView] No token available, triggering native logout');
       setState(() {
         _hasError = true;
         _isLoading = false;
       });
+      _handleSessionExpired();
       return;
     }
 
@@ -46,6 +48,41 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
 
     _loadedToken = token;
     _initWebView(token);
+  }
+
+  void _handleSessionExpired() {
+    if (_isHandlingSessionExpired) return;
+    _isHandlingSessionExpired = true;
+    debugPrint('[MerchantWebView] Session expired detected -> logout native');
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await ref.read(authProvider.notifier).logout();
+      } catch (e) {
+        debugPrint('[MerchantWebView] Error during expired logout: $e');
+      } finally {
+        _isHandlingSessionExpired = false;
+      }
+    });
+  }
+
+  bool _isLoginWebPage(Uri uri) {
+    // Deteksi apakah WebView mengarah ke halaman login web (tanpa token query)
+    // Kasus expired: Nuxt middleware redirect /merchant/menu atau /merchant/* ke /merchant/login
+    final path = uri.path;
+    final hasTokenQuery = uri.queryParameters.containsKey('token') && (uri.queryParameters['token']?.isNotEmpty ?? false);
+
+    // Jika path adalah login web dan tidak bawa token => token expired / session invalid
+    if (hasTokenQuery) return false;
+
+    if (path == '/merchant/login' || path == '/merchant/login/' || path == '/login' || path == '/login/') {
+      return true;
+    }
+    // Kadang web redirect ke root dengan param? tetap anggap expired jika WebView sebelumnya sudah login dan tiba-tiba balik ke login
+    if (_loadedToken != null && (path == '/merchant/login' || path.contains('/merchant/login'))) {
+      return true;
+    }
+    return false;
   }
 
   void _initWebView(String token) {
@@ -141,9 +178,51 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
     newController
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'NitipLogout',
+        onMessageReceived: (JavaScriptMessage message) {
+          debugPrint('[MerchantWebView] JS channel NitipLogout received: ${message.message}');
+          _handleSessionExpired();
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            final uri = Uri.tryParse(request.url);
+            if (uri != null) {
+              if (_isLoginWebPage(uri)) {
+                // Skip jika ini request awal dengan token (bridge login)
+                final isBridgeRequest = request.url.contains('/merchant/login') && uri.queryParameters.containsKey('token');
+                if (!isBridgeRequest) {
+                  debugPrint('[MerchantWebView] Blocked web login page navigation -> native logout: $uri');
+                  _handleSessionExpired();
+                  return NavigationDecision.prevent;
+                }
+              }
+            }
+            return NavigationDecision.navigate;
+          },
+          onUrlChange: (UrlChange change) {
+            final urlStr = change.url ?? '';
+            final uri = Uri.tryParse(urlStr);
+            if (uri != null && _isLoginWebPage(uri)) {
+              final isBridge = urlStr.contains('/merchant/login') && uri.queryParameters.containsKey('token');
+              if (!isBridge) {
+                debugPrint('[MerchantWebView] onUrlChange detected login web -> native logout: $uri');
+                _handleSessionExpired();
+              }
+            }
+          },
           onPageStarted: (String url) {
+            final uri = Uri.tryParse(url);
+            if (uri != null && _isLoginWebPage(uri)) {
+              final isBridge = url.contains('/merchant/login') && uri.queryParameters.containsKey('token');
+              if (!isBridge) {
+                debugPrint('[MerchantWebView] onPageStarted login web detected -> native logout: $uri');
+                // Jangan set loading, langsung logout
+                _handleSessionExpired();
+              }
+            }
             if (mounted) {
               setState(() {
                 _isLoading = true;
@@ -154,9 +233,25 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
           onPageFinished: (String url) async {
             debugPrint('[MerchantWebView] Page finished: $url');
 
+            final uri = Uri.tryParse(url);
+            if (uri != null && _isLoginWebPage(uri)) {
+              final isBridge = url.contains('/merchant/login') && uri.queryParameters.containsKey('token');
+              if (!isBridge) {
+                debugPrint('[MerchantWebView] Page finished still on login web -> force native logout');
+                _handleSessionExpired();
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
+                return;
+              }
+            }
+
             // Unregister semua Service Worker PWA agar tidak mengintervensi
             // navigasi & routing internal. WebView mobile tidak perlu PWA caching.
-            const unregisterSW = '''
+            // Dan inject JS helper untuk memanggil NitipLogout channel jika web detect 401
+            const jsHelpers = '''
               (function() {
                 if ('serviceWorker' in navigator) {
                   navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -166,10 +261,40 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
                     }
                   });
                 }
+                // Helper: expose function for web to trigger native logout when session expired
+                window.triggerNativeLogout = function(reason) {
+                  try {
+                    if (window.NitipLogout) {
+                      window.NitipLogout.postMessage(reason || 'session_expired');
+                    }
+                  } catch (e) {
+                    console.log('[WebView Mobile] triggerNativeLogout error', e);
+                  }
+                };
+                // Intercept 401 di fetch/XHR untuk merchant portal (optional best-effort)
+                (function() {
+                  const origFetch = window.fetch;
+                  window.fetch = async function() {
+                    const resp = await origFetch.apply(this, arguments);
+                    try {
+                      if (resp.status === 401) {
+                        const url = arguments[0];
+                        if (typeof url === 'string' && url.includes('/api/')) {
+                          console.log('[WebView Mobile] 401 detected on API, triggering native logout');
+                          window.triggerNativeLogout('api_401');
+                        }
+                      }
+                    } catch (e) {}
+                    return resp;
+                  };
+                })();
               })();
             ''';
-            // Gunakan _webViewController (field kelas) bukan local variable
-            await _webViewController?.runJavaScript(unregisterSW);
+            try {
+              await _webViewController?.runJavaScript(jsHelpers);
+            } catch (e) {
+              debugPrint('[MerchantWebView] JS injection failed: $e');
+            }
 
             if (mounted) {
               setState(() {

@@ -134,4 +134,21 @@ class WalletRepositoryImpl implements WalletRepository {
       throw Exception(message);
     }
   }
+
+  @override
+  Future<UserBankAccountModel?> getRegisteredBankAccount() async {
+    try {
+      final response = await apiClient.dio.get('/users/me/bank-account');
+      if (response.data['success'] == true && response.data['data'] != null) {
+        return UserBankAccountModel.fromJson(response.data['data']);
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
+  }
 }

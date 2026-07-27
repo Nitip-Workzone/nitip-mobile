@@ -223,12 +223,13 @@ class OrderModel {
   String get formattedCreatedAt => DateFormat('dd MMM yyyy, HH:mm').format(createdAt);
   
   bool get isPending => status == 'pending';
+  bool get isMerchantAccepted => status == 'merchant_accepted';
   bool get isAccepted => status == 'accepted';
   bool get isCooking => status == 'cooking';
   bool get isReady => status == 'ready';
   bool get isPurchasing => status == 'purchasing';
   bool get isDelivering => status == 'delivering';
-  bool get isOnProgress => status == 'on_progress' || status == 'purchasing' || status == 'delivering' || status == 'cooking' || status == 'ready';
+  bool get isOnProgress => status == 'on_progress' || status == 'purchasing' || status == 'delivering' || status == 'cooking' || status == 'ready' || status == 'merchant_accepted';
   bool get isCompleted => status == 'completed';
   bool get isCancelled => status == 'cancelled';
   bool get isDisputed => status == 'disputed';

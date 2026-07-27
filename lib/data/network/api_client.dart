@@ -9,8 +9,9 @@ import '../../core/services/hmac_service.dart';
 class ApiClient {
   late Dio dio;
   final _storage = const FlutterSecureStorage();
+  final Future<void> Function()? onSessionExpired;
 
-  ApiClient() {
+  ApiClient({this.onSessionExpired}) {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -70,6 +71,11 @@ class ApiClient {
               if (grantToken == null) {
                 debugPrint('[API_DEBUG] Failed to get grant token for refresh.');
                 await _clearSession();
+                if (onSessionExpired != null) {
+                  try {
+                    await onSessionExpired!.call();
+                  } catch (_) {}
+                }
                 return handler.next(e);
               }
 
@@ -112,12 +118,30 @@ class ApiClient {
               if (refreshErr.response?.statusCode == 401 || refreshErr.response?.statusCode == 400) {
                 debugPrint('[API_DEBUG] Refresh token invalid/expired. Clearing session.');
                 await _clearSession();
+                if (onSessionExpired != null) {
+                  try {
+                    await onSessionExpired!.call();
+                  } catch (_) {}
+                }
               }
             } catch (e) {
               debugPrint('[API_DEBUG] Unexpected error during refresh: $e');
+              // Fail-safe: clear + expire on unexpected error during refresh to avoid infinite loop
+              await _clearSession();
+              if (onSessionExpired != null) {
+                try {
+                  await onSessionExpired!.call();
+                } catch (_) {}
+              }
             }
           } else {
             debugPrint('[API_DEBUG] No refresh token found. User must re-login.');
+            await _clearSession();
+            if (onSessionExpired != null) {
+              try {
+                await onSessionExpired!.call();
+              } catch (_) {}
+            }
           }
         }
         return handler.next(e);

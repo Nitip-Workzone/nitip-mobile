@@ -64,4 +64,5 @@ class AppConfig {
 
   /// Toggle untuk validasi KYC di sisi klien
   static bool isKycRequired = false;
+  static String withdrawalSchedule = 'Setiap hari pukul 09:00 WITA';
 }

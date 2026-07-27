@@ -44,8 +44,24 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<void> cancelOrder(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/cancel');
+  Future<void> cancelOrder(String id, {String? reason}) async {
+    final response = await _apiClient.dio.post(
+      '/orders/$id/cancel',
+      data: reason != null ? {'reason': reason} : null,
+    );
+    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+    if (!apiResponse.success) throw Exception(apiResponse.message);
+  }
+
+  @override
+  Future<void> disputeOrder(String id, String reason, String proofUrl) async {
+    final response = await _apiClient.dio.post(
+      '/orders/$id/dispute',
+      data: {
+        'reason': reason,
+        'proof_url': proofUrl,
+      },
+    );
     final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
     if (!apiResponse.success) throw Exception(apiResponse.message);
   }

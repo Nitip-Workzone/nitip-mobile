@@ -15,12 +15,42 @@ import './notification_provider.dart';
 import './activity_provider.dart';
 import './location_provider.dart';
 
-// Provider untuk ApiClient
-final apiClientProvider = Provider((ref) => ApiClient());
+// Provider untuk ApiClient dengan session expired callback
+// Untuk menghindari cycle authProvider -> authRepositoryProvider -> apiClientProvider -> authProvider,
+// kita buat apiClient tanpa ref read di dalam callback secara sinkron.
+// Callback akan melakukan storage clear langsung, lalu forceLogout via microtask
+// dengan mencoba read authProvider (safe karena microtask dieksekusi setelah provider init).
+// Raw client tanpa callback untuk auth repo (hindari cycle)
+final _rawApiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
-// Provider untuk AuthRepository
+// Provider untuk ApiClient dengan session expired callback - dipakai untuk semua repo kecuali auth
+final apiClientProvider = Provider<ApiClient>((ref) {
+  return ApiClient(
+    onSessionExpired: () async {
+      debugPrint('[Auth] Session expired callback triggered from ApiClient');
+      try {
+        const storage = FlutterSecureStorage();
+        await storage.delete(key: 'access_token');
+        await storage.delete(key: 'refresh_token');
+      } catch (_) {}
+
+      Future.microtask(() {
+        try {
+          final notifier = ref.read(authProvider.notifier);
+          notifier.forceLogout();
+        } catch (e) {
+          debugPrint('[Auth] Failed to forceLogout from callback: $e');
+        }
+      });
+    },
+  );
+});
+
+// Provider untuk AuthRepository - pakai raw client untuk menghindari circular dependency
+// authProvider -> authRepositoryProvider -> apiClientProvider (with callback reads authProvider) = cycle
+// Solusi: auth repo pakai raw client tanpa callback, jadi cycle terputus
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
+  final apiClient = ref.watch(_rawApiClientProvider);
   return AuthRepositoryImpl(apiClient);
 });
 
@@ -83,7 +113,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final config = await _repository.getPublicConfig();
       AppConfig.isKycRequired = config['kyc_verification_required'] ?? false;
+      AppConfig.withdrawalSchedule = config['withdrawal_schedule'] ?? 'Setiap hari pukul 09:00 WITA';
       debugPrint('[CONFIG] Dynamic KYC verification requirement set to: ${AppConfig.isKycRequired}');
+      debugPrint('[CONFIG] Dynamic withdrawal schedule set to: ${AppConfig.withdrawalSchedule}');
     } catch (e) {
       debugPrint('[CONFIG] Failed to load public config from backend: $e');
     }
@@ -260,6 +292,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _ref.invalidate(walletProvider);
     _ref.invalidate(notificationProvider);
     _ref.invalidate(activityProvider);
+
+    state = AuthState(isInitialized: true);
+  }
+
+  /// Force logout tanpa async dependency - aman dipanggil dari callback ApiClient
+  /// karena bisa terjadi saat Dio interceptor sedang running
+  void forceLogout() {
+    debugPrint('[Auth] forceLogout called');
+    try {
+      _ref.invalidate(walletProvider);
+    } catch (_) {}
+    try {
+      _ref.invalidate(notificationProvider);
+    } catch (_) {}
+    try {
+      _ref.invalidate(activityProvider);
+    } catch (_) {}
+    try {
+      _ref.invalidate(kycProvider);
+    } catch (_) {}
+    try {
+      _ref.invalidate(userLocationProvider);
+    } catch (_) {}
 
     state = AuthState(isInitialized: true);
   }

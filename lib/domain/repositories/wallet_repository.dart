@@ -16,4 +16,5 @@ abstract class WalletRepository {
     required String pin,
     required Map<String, dynamic> metadata,
   });
+  Future<UserBankAccountModel?> getRegisteredBankAccount();
 }

@@ -652,15 +652,15 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
     if (order.isFoodOrder) {
       switch (order.status) {
-        case 'accepted':
+        case 'merchant_accepted':
           icon = Icons.storefront_rounded;
-          statusLine = 'Menuju Merchant';
-          actionLine = 'Pergi ke merchant. Persiapan dimulai setelah Anda tiba.';
+          statusLine = 'Diterima Dapur';
+          actionLine = 'Menunggu Runner mengambil pesanan.';
           break;
         case 'cooking':
           icon = Icons.restaurant_menu_rounded;
-          statusLine = 'Dapur Sedang Memasak';
-          actionLine = 'Harap tunggu makanan disiapkan oleh merchant';
+          statusLine = 'Menuju Merchant';
+          actionLine = 'Pergi ke merchant. Dapur sedang memasak pesanan.';
           break;
         case 'ready':
           icon = Icons.storefront_rounded;
@@ -1676,96 +1676,96 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       );
     }
 
+    final user = ref.read(authProvider).user;
+    final isRequester = user?.id == order.requesterId;
+    final isMerchant = order.merchantId != null && !isRunner && !isRequester;
+
+    Widget? mainAction;
+
     if (isRunner) {
       if (order.status == 'pending') {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: _buildActionButton(
-            label: 'Ambil Tugas Ini',
-            icon: Icons.check_circle_outline_rounded,
-            color: AppColors.secondary,
-            onPressed: () => _handleAccept(context, order.id),
-          ),
+        mainAction = _buildActionButton(
+          label: 'Ambil Tugas Ini',
+          icon: Icons.check_circle_outline_rounded,
+          color: AppColors.secondary,
+          onPressed: () => _handleAccept(context, order.id),
         );
       } else if (order.isFoodOrder && (order.status == 'accepted' || order.status == 'cooking')) {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: null, // Disabled: wait for kitchen
-              icon: const Icon(Icons.hourglass_top_rounded, size: 20),
-              label: const Text('Menunggu Dapur Menyiapkan...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
+        mainAction = SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: null, // Disabled: wait for kitchen
+            icon: const Icon(Icons.hourglass_top_rounded, size: 20),
+            label: const Text('Menunggu Dapur Menyiapkan...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
         );
       } else if (order.isFoodOrder && order.status == 'ready') {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: _buildActionButton(
-            label: 'Jemput & Mulai Pengantaran',
-            icon: Icons.local_shipping_rounded,
-            color: primary,
-            onPressed: () => _handlePickup(context, order.id),
-          ),
+        mainAction = _buildActionButton(
+          label: 'Jemput & Mulai Pengantaran',
+          icon: Icons.local_shipping_rounded,
+          color: primary,
+          onPressed: () => _handlePickup(context, order.id),
         );
       } else if (order.status == 'accepted') {
         if (order.serviceCategory == 'beli') {
-          return Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: _buildActionButton(
-              label: 'Belanja & Unggah Struk',
-              icon: Icons.receipt_long_rounded,
-              color: AppColors.warning,
-              onPressed: () => _handlePurchase(context, order.id),
-            ),
+          mainAction = _buildActionButton(
+            label: 'Belanja & Unggah Struk',
+            icon: Icons.receipt_long_rounded,
+            color: AppColors.warning,
+            onPressed: () => _handlePurchase(context, order.id),
           );
         } else {
-          return Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: _buildActionButton(
-              label: 'Ambil & Mulai Pengantaran',
-              icon: Icons.local_shipping_rounded,
-              color: primary,
-              onPressed: () => _handlePickup(context, order.id),
-            ),
-          );
-        }
-      } else if (order.status == 'purchasing') {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: _buildActionButton(
+          mainAction = _buildActionButton(
             label: 'Ambil & Mulai Pengantaran',
             icon: Icons.local_shipping_rounded,
             color: primary,
             onPressed: () => _handlePickup(context, order.id),
-          ),
+          );
+        }
+      } else if (order.status == 'purchasing') {
+        mainAction = _buildActionButton(
+          label: 'Ambil & Mulai Pengantaran',
+          icon: Icons.local_shipping_rounded,
+          color: primary,
+          onPressed: () => _handlePickup(context, order.id),
         );
       } else if (order.status == 'delivering' || order.status == 'on_progress') {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: _buildActionButton(
-            label: 'Konfirmasi Selesai (Scan/Input QR)',
-            icon: Icons.qr_code_scanner_rounded,
-            color: AppColors.success,
-            onPressed: () => _showCompletionDialog(context, order.id),
-          ),
+        mainAction = _buildActionButton(
+          label: 'Konfirmasi Selesai (Scan/Input QR)',
+          icon: Icons.qr_code_scanner_rounded,
+          color: AppColors.success,
+          onPressed: () => _showCompletionDialog(context, order.id),
         );
       }
     }
 
-    return const SizedBox.shrink();
+    final cancelBtn = _buildCancelButton(order, isRunner, isRequester, isMerchant);
+    final disputeBtn = _buildDisputeButton(order, isRequester);
+
+    if (mainAction == null && cancelBtn == null && disputeBtn == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (mainAction != null) ...[
+            mainAction,
+            if (cancelBtn != null || disputeBtn != null) const SizedBox(height: 8),
+          ],
+          if (cancelBtn != null) cancelBtn,
+          if (disputeBtn != null) disputeBtn,
+        ],
+      ),
+    );
   }
 
   void _handleAccept(BuildContext context, String orderId) async {
@@ -2303,6 +2303,8 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
           orElse: () => throw Exception('Order not found'),
         );
     final expectedCode = activeOrder.completionCode ?? '';
+    final timeDiff = DateTime.now().difference(activeOrder.updatedAt);
+    final isStagnant = timeDiff.inMinutes > 30 && activeOrder.status == 'delivering';
 
     showDialog(
       context: context,
@@ -2320,6 +2322,30 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (isStagnant) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Selesai Tanpa PIN: Anda dapat menyelesaikan pesanan tanpa kode PIN/QR karena status telah stagnan > 30 menit. Foto bukti wajib diunggah.',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.warning),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const Text('Scan QR pada aplikasi Penitip atau masukkan kode konfirmasi di bawah ini:'),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -2345,6 +2371,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                         ),
                       ),
                       validator: (val) {
+                        if (isStagnant && selectedDeliveryFile != null) {
+                          return null; // Bypass PIN code requirement
+                        }
                         if (val == null || val.isEmpty) return 'Kode wajib diisi';
                         return null;
                       },
@@ -2376,7 +2405,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                     ],
                     const SizedBox(height: 16),
                     const Text(
-                      'Foto bukti penyerahan barang (Opsional):',
+                      'Foto bukti penyerahan barang (Wajib jika tanpa PIN):',
                       style: TextStyle(fontSize: 13, color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 8),
@@ -2410,10 +2439,17 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                 onPressed: isSubmitting
                     ? null
                     : () async {
-                        if (formKey.currentState?.validate() ?? false) {
-                          final code = codeController.text.trim();
-                          final localPath = selectedDeliveryFile?.path ?? '';
+                        final code = codeController.text.trim();
+                        final localPath = selectedDeliveryFile?.path ?? '';
 
+                        if (isStagnant && code.isEmpty && localPath.isEmpty) {
+                          setDialogState(() {
+                            errorMessage = 'Foto bukti wajib diunggah untuk penyelesaian tanpa PIN.';
+                          });
+                          return;
+                        }
+
+                        if (formKey.currentState?.validate() ?? false) {
                           setDialogState(() {
                             isSubmitting = true;
                             errorMessage = null;
@@ -2441,6 +2477,276 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Konfirmasi'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget? _buildCancelButton(OrderModel order, bool isRunner, bool isRequester, bool isMerchant) {
+    if (order.status == 'completed' || order.status == 'cancelled') return null;
+
+    final timeDiff = DateTime.now().difference(order.updatedAt);
+    final isStagnant = timeDiff.inMinutes > 30;
+
+    bool canNormalCancel = false;
+    if (isRequester) {
+      if (order.isFoodOrder) {
+        canNormalCancel = order.status == 'pending' || order.status == 'merchant_accepted';
+      } else if (order.serviceCategory == 'kirim') {
+        canNormalCancel = order.status == 'pending' || order.status == 'accepted';
+      } else { // beli
+        canNormalCancel = order.status == 'pending' || order.status == 'accepted';
+      }
+    }
+
+    final isAllowedToCancel = canNormalCancel || (isStagnant && (isRequester || isRunner || isMerchant));
+    if (!isAllowedToCancel) return null;
+
+    return Container(
+      width: double.infinity,
+      height: 48,
+      margin: const EdgeInsets.only(top: 8),
+      child: OutlinedButton.icon(
+        onPressed: () => _showCancelDialog(context, order.id, isStagnant: !canNormalCancel),
+        icon: const Icon(Icons.cancel_outlined, size: 20),
+        label: Text(
+          !canNormalCancel ? 'Batalkan Pesanan (Stagnan > 30m)' : 'Batalkan Pesanan',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.error,
+          side: const BorderSide(color: AppColors.error),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildDisputeButton(OrderModel order, bool isRequester) {
+    if (order.status != 'completed' || !isRequester) return null;
+    final timeDiff = DateTime.now().difference(order.updatedAt);
+    if (timeDiff.inHours > 24) return null;
+
+    return Container(
+      width: double.infinity,
+      height: 48,
+      margin: const EdgeInsets.only(top: 8),
+      child: OutlinedButton.icon(
+        onPressed: () => _showDisputeDialog(context, order.id),
+        icon: const Icon(Icons.gavel_rounded, size: 20),
+        label: const Text('Ajukan Dispute / Sengketa', style: TextStyle(fontWeight: FontWeight.w600)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.warning,
+          side: const BorderSide(color: AppColors.warning),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  void _showCancelDialog(BuildContext context, String orderId, {required bool isStagnant}) {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSubmitting = false;
+        String? errorMessage;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Batalkan Pesanan'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(isStagnant 
+                      ? 'Status pesanan tidak berubah selama lebih dari 30 menit. Anda dapat membatalkannya, tetapi wajib memberikan alasan pembatalan.'
+                      : 'Apakah Anda yakin ingin membatalkan pesanan ini? Jika dibatalkan sekarang, tidak ada biaya penalti.'),
+                    if (isStagnant) ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: reasonController,
+                        decoration: const InputDecoration(
+                          labelText: 'Alasan Pembatalan',
+                          border: OutlineInputBorder(),
+                          hintText: 'Contoh: Runner tidak kunjung bergerak / salah rute...',
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Alasan pembatalan wajib diisi';
+                          return null;
+                        },
+                        maxLines: 3,
+                        enabled: !isSubmitting,
+                      ),
+                    ],
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(errorMessage!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Tutup'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (!isStagnant || (formKey.currentState?.validate() ?? false)) {
+                          setDialogState(() {
+                            isSubmitting = true;
+                            errorMessage = null;
+                          });
+
+                          try {
+                            final reason = isStagnant ? reasonController.text.trim() : null;
+                            await ref.read(orderRepositoryProvider).cancelOrder(orderId, reason: reason);
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close dialog
+                              ref.invalidate(activityProvider);
+                              _showSnackBar('Pesanan berhasil dibatalkan');
+                              Navigator.pop(context); // Go back
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              errorMessage = e.toString().replaceAll('Exception: ', '');
+                            });
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Batalkan'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDisputeDialog(BuildContext context, String orderId) {
+    final reasonController = TextEditingController();
+    final proofController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSubmitting = false;
+        String? errorMessage;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Ajukan Dispute / Sengketa'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Silakan masukkan alasan dispute dan URL bukti (misalnya link gambar dari storage):'),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: reasonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Alasan Sengketa',
+                        border: OutlineInputBorder(),
+                        hintText: 'Jelaskan masalah secara detail...',
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Alasan sengketa wajib diisi';
+                        return null;
+                      },
+                      maxLines: 3,
+                      enabled: !isSubmitting,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: proofController,
+                      decoration: const InputDecoration(
+                        labelText: 'URL Bukti Gambar',
+                        border: OutlineInputBorder(),
+                        hintText: 'https://...',
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'URL bukti sengketa wajib diisi';
+                        if (!val.startsWith('http://') && !val.startsWith('https://')) return 'URL tidak valid';
+                        return null;
+                      },
+                      enabled: !isSubmitting,
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(errorMessage!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (formKey.currentState?.validate() ?? false) {
+                          setDialogState(() {
+                            isSubmitting = true;
+                            errorMessage = null;
+                          });
+
+                          try {
+                            final reason = reasonController.text.trim();
+                            final proof = proofController.text.trim();
+                            await ref.read(orderRepositoryProvider).disputeOrder(orderId, reason, proof);
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close dialog
+                              ref.invalidate(activityProvider);
+                              _showSnackBar('Dispute berhasil diajukan');
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              errorMessage = e.toString().replaceAll('Exception: ', '');
+                            });
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning, foregroundColor: Colors.white),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Kirim Dispute'),
               ),
             ],
           ),
@@ -2628,7 +2934,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   String _getStatusTitle(String status, bool isRunner, bool isFoodOrder) {
     switch (status.toLowerCase()) {
       case 'pending': return isRunner ? 'Tugas Baru Tersedia' : (isFoodOrder ? 'Menunggu Dapur Menerima' : 'Menunggu Runner');
-      case 'accepted': return isRunner ? 'Tugas Diterima' : (isFoodOrder ? 'Pesanan Diterima Dapur' : 'Pesanan Diterima');
+      case 'merchant_accepted': return 'Pesanan Diterima Dapur';
+      case 'accepted': return isRunner ? 'Tugas Diterima' : 'Pesanan Diterima';
+      case 'cooking': return isFoodOrder ? 'Dapur Sedang Memasak' : (isRunner ? 'Tugas Diterima' : 'Pesanan Diterima');
+      case 'ready': return 'Pesanan Siap Diambil';
       case 'purchasing': return isRunner ? 'Sedang Belanja' : 'Sedang Dibeli';
       case 'delivering': return isRunner ? 'Dalam Pengantaran' : 'Dalam Pengantaran';
       case 'on_progress': return isRunner ? 'Dalam Pengerjaan' : 'Sedang Diproses';
@@ -2641,7 +2950,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   String _getStatusDesc(String status, bool isRunner, bool isFoodOrder) {
     switch (status.toLowerCase()) {
       case 'pending': return isRunner ? 'Ambil tugas ini segera sebelum diambil Runner lain.' : (isFoodOrder ? 'Pesanan Anda sedang menunggu konfirmasi dari pihak dapur.' : 'Pesanan Anda sedang dicarikan Runner terdekat.');
-      case 'accepted': return isRunner ? 'Anda telah menyetujui untuk menjalankan tugas ini.' : (isFoodOrder ? 'Pesanan Anda telah disetujui dapur. Sistem sedang mencari runner terdekat.' : 'Runner telah menyetujui pesanan Anda.');
+      case 'merchant_accepted': return isRunner ? 'Pesanan telah disetujui dapur. Silakan ambil tugas ini.' : 'Pesanan Anda telah disetujui dapur. Sistem sedang mencari runner terdekat.';
+      case 'accepted': return isRunner ? 'Anda telah menyetujui untuk menjalankan tugas ini.' : 'Runner telah menyetujui pesanan Anda.';
+      case 'cooking': return isFoodOrder ? (isRunner ? 'Harap tunggu makanan disiapkan oleh merchant.' : 'Dapur sedang memasak pesanan Anda.') : (isRunner ? 'Anda telah menyetujui untuk menjalankan tugas ini.' : 'Runner telah menyetujui pesanan Anda.');
+      case 'ready': return isRunner ? 'Makanan siap dijemput di merchant.' : 'Makanan Anda sudah matang dan siap dijemput oleh runner.';
       case 'purchasing': return isRunner ? 'Anda sedang membelikan barang pesanan.' : 'Runner sedang membelikan barang pesanan Anda.';
       case 'delivering': return isRunner ? 'Anda sedang mengantarkan barang ke tujuan.' : 'Runner sedang mengantarkan barang ke lokasi Anda.';
       case 'on_progress': return isRunner ? 'Anda sedang menuju lokasi atau mengantar barang.' : 'Runner sedang menuju lokasi atau mengantar barang.';

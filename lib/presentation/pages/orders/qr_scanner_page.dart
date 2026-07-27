@@ -1,5 +1,5 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -13,10 +13,9 @@ class QrScannerPage extends StatefulWidget {
 }
 
 class _QrScannerPageState extends State<QrScannerPage> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  CameraController? _controller;
-  List<CameraDescription> _cameras = [];
+  MobileScannerController? _scannerController;
   bool _isPermissionGranted = false;
-  bool _isInitializing = false;
+  bool _isHandling = false;
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
 
@@ -41,89 +40,80 @@ class _QrScannerPageState extends State<QrScannerPage> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    _scannerController?.dispose();
     _laserController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-
+    final ctrl = _scannerController;
+    if (ctrl == null) return;
     if (state == AppLifecycleState.inactive) {
-      controller.dispose();
+      ctrl.stop();
     } else if (state == AppLifecycleState.resumed) {
-      if (_cameras.isNotEmpty) {
-        _startCamera(_cameras.first);
-      }
+      ctrl.start();
     }
   }
 
   Future<void> _initialize() async {
     final status = await Permission.camera.request();
     if (!status.isGranted || !mounted) {
-      // If permission is denied, we can still allow mock/simulated scanning since we are in dev/emulator
       setState(() => _isPermissionGranted = false);
       return;
     }
 
     setState(() => _isPermissionGranted = true);
     try {
-      _cameras = await availableCameras();
-      if (_cameras.isNotEmpty) {
-        await _startCamera(_cameras.first);
-        
-        // Auto-complete simulation after 1.8 seconds for an effortless premium feel!
-        Future.delayed(const Duration(milliseconds: 1800), () {
-          if (mounted) {
-            _successPop();
-          }
-        });
-      }
+      _scannerController = MobileScannerController(
+        detectionSpeed: DetectionSpeed.noDuplicates,
+        facing: CameraFacing.back,
+        torchEnabled: false,
+      );
+      // No auto-pop anymore - real scanner will drive completion
+      // Keep fallback simulation only for permission denied case
     } catch (e) {
-      debugPrint('Error getting cameras: $e');
+      debugPrint('Error init scanner: $e');
     }
   }
 
-  Future<void> _startCamera(CameraDescription cam) async {
-    if (_isInitializing) return;
-    _isInitializing = true;
+  void _onDetect(BarcodeCapture capture) {
+    if (_isHandling) return;
+    final barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
 
-    final oldController = _controller;
-    if (oldController != null) {
-      setState(() => _controller = null);
-      await oldController.dispose();
-    }
+    for (final barcode in barcodes) {
+      final raw = barcode.rawValue?.trim();
+      if (raw == null || raw.isEmpty) continue;
 
-    final newController = CameraController(
-      cam,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
+      // Accept 6-digit code or any string - backend validates equality
+      // If raw looks like QR containing the code, extract digits
+      String candidate = raw;
+      
+      // If QR data contains formatting, try to extract 6-digit token
+      final regExp = RegExp(r'\b(\d{6})\b');
+      final match = regExp.firstMatch(raw);
+      if (match != null && widget.expectedCode.isNotEmpty) {
+        // Prefer extracted 6-digit if expectedCode is 6-digit
+        candidate = match.group(1) ?? raw;
+      }
 
-    try {
-      await newController.initialize();
-    } catch (e) {
-      debugPrint('Camera init error: $e');
-      _isInitializing = false;
+      _isHandling = true;
+      _scannerController?.stop();
+      Navigator.pop(context, candidate);
       return;
     }
-
-    if (!mounted) {
-      newController.dispose();
-      _isInitializing = false;
-      return;
-    }
-
-    setState(() {
-      _controller = newController;
-      _isInitializing = false;
-    });
   }
 
   void _successPop() {
+    // Simulation fallback - return expectedCode as before for emulator testing
+    if (_isHandling) return;
+    _isHandling = true;
     Navigator.pop(context, widget.expectedCode);
+  }
+
+  void _toggleTorch() {
+    _scannerController?.toggleTorch();
   }
 
   @override
@@ -135,10 +125,13 @@ class _QrScannerPageState extends State<QrScannerPage> with WidgetsBindingObserv
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ── Real Camera Preview or Premium Mock Background ──
+          // ── Real Mobile Scanner or Premium Mock Background ──
           Positioned.fill(
-            child: _isPermissionGranted && _controller != null && _controller!.value.isInitialized
-                ? CameraPreview(_controller!)
+            child: _isPermissionGranted && _scannerController != null
+                ? MobileScanner(
+                    controller: _scannerController,
+                    onDetect: _onDetect,
+                  )
                 : Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -234,15 +227,29 @@ class _QrScannerPageState extends State<QrScannerPage> with WidgetsBindingObserv
                   ),
                 ),
                 const SizedBox(width: 16),
-                const Text(
-                  'Scan QR Code',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                const Expanded(
+                  child: Text(
+                    'Scan QR Code',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+                    ),
                   ),
                 ),
+                if (_isPermissionGranted)
+                  GestureDetector(
+                    onTap: _toggleTorch,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
+                    ),
+                  ),
               ],
             ),
           ),

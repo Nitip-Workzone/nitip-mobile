@@ -99,3 +99,29 @@ class WithdrawalChannelModel {
     );
   }
 }
+
+class UserBankAccountModel {
+  final String id;
+  final String userId;
+  final String bankName;
+  final String accountNo;
+  final String accountName;
+
+  UserBankAccountModel({
+    required this.id,
+    required this.userId,
+    required this.bankName,
+    required this.accountNo,
+    required this.accountName,
+  });
+
+  factory UserBankAccountModel.fromJson(Map<String, dynamic> json) {
+    return UserBankAccountModel(
+      id: json['id'],
+      userId: json['user_id'],
+      bankName: json['bank_name'],
+      accountNo: json['account_no'],
+      accountName: json['account_name'],
+    );
+  }
+}

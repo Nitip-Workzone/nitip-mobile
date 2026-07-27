@@ -5,7 +5,8 @@ abstract class OrderRepository {
   Future<List<OrderModel>> getAvailableOrders();
   Future<OrderModel> getOrderById(String id);
   Future<OrderModel> createOrder(Map<String, dynamic> data);
-  Future<void> cancelOrder(String id);
+  Future<void> cancelOrder(String id, {String? reason});
+  Future<void> disputeOrder(String id, String reason, String proofUrl);
   Future<void> acceptOrder(String id);
   Future<void> purchaseOrder(String id, String receiptPath);
   Future<void> adjustPrice(String id, double adjustedCost, String reason);

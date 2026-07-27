@@ -211,3 +211,9 @@ final withdrawalChannelsProvider = FutureProvider<List<WithdrawalChannelModel>>(
   final repository = ref.watch(walletRepositoryProvider);
   return repository.getWithdrawalChannels();
 });
+
+// Provider untuk mengambil data rekening terdaftar user
+final userBankAccountProvider = FutureProvider<UserBankAccountModel?>((ref) async {
+  final repository = ref.watch(walletRepositoryProvider);
+  return repository.getRegisteredBankAccount();
+});
