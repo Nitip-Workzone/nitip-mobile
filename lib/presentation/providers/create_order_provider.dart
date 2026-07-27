@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import '../../core/config/app_config.dart';
 import '../../domain/repositories/order_repository.dart';
 import 'activity_provider.dart';
 import 'wallet_provider.dart';
@@ -139,7 +140,14 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
     estimateFee();
   }
 
-  void updatePaymentMethod(String method) => state = state.copyWith(paymentMethod: method);
+  void updatePaymentMethod(String method) {
+    if (!AppConfig.isCodEnabled && method == 'cod') {
+      // Force back to escrow if COD disabled
+      state = state.copyWith(paymentMethod: 'escrow');
+      return;
+    }
+    state = state.copyWith(paymentMethod: method);
+  }
   void updateServiceCategory(String category) => state = state.copyWith(serviceCategory: category);
   void updateReceiverName(String value) => state = state.copyWith(receiverName: value);
   void updateReceiverPhone(String value) => state = state.copyWith(receiverPhone: value);

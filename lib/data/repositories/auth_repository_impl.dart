@@ -160,13 +160,34 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> updateLocation(double lat, double lng) async {
     try {
-      await apiClient.dio.get('/users/me', options: Options(
-        headers: {
-          'X-Location': '$lat,$lng',
-        },
-      ));
+      // Legacy: sekarang pakai dedicated heartbeat, tapi keep untuk kompatibilitas UI
+      await apiClient.dio.post('/users/location', data: {
+        'lat': lat,
+        'lng': lng,
+      });
     } catch (_) {
       // Silently fail for passive location updates
+    }
+  }
+
+  @override
+  Future<void> sendHeartbeat({
+    required double lat,
+    required double lng,
+    String? tripId,
+    required int activeOrders,
+    required bool isForeground,
+  }) async {
+    try {
+      await apiClient.dio.post('/users/heartbeat', data: {
+        'lat': lat,
+        'lng': lng,
+        if (tripId != null) 'trip_id': tripId,
+        'active_orders': activeOrders,
+        'is_foreground': isForeground,
+      });
+    } catch (_) {
+      // Silent for heartbeat
     }
   }
 

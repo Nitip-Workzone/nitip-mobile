@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../providers/auth_provider.dart';
@@ -179,6 +180,28 @@ class TitipBeliPage extends ConsumerWidget {
                 const Divider(height: 32),
                   _buildSectionTitle('Metode Pembayaran', small: true),
                   const SizedBox(height: 8),
+                  if (!AppConfig.isCodEnabled)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 16, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Metode COD sedang dinonaktifkan oleh admin. Hanya Nitip Pay (Escrow) yang tersedia.',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   Row(
                     children: [
                       Expanded(
@@ -189,19 +212,21 @@ class TitipBeliPage extends ConsumerWidget {
                           primary: primary,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildPaymentOption(
-                          label: 'Bayar di Tempat (COD)',
-                          isSelected: state.paymentMethod == 'cod',
-                          isEnabled: ref.watch(authProvider).user?.isVerified ?? false,
-                          onTap: () => notifier.updatePaymentMethod('cod'),
-                          primary: primary,
+                      if (AppConfig.isCodEnabled) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildPaymentOption(
+                            label: 'Bayar di Tempat (COD)',
+                            isSelected: state.paymentMethod == 'cod',
+                            isEnabled: ref.watch(authProvider).user?.isVerified ?? false,
+                            onTap: () => notifier.updatePaymentMethod('cod'),
+                            primary: primary,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-                  if (!(ref.watch(authProvider).user?.isVerified ?? false))
+                  if (AppConfig.isCodEnabled && !(ref.watch(authProvider).user?.isVerified ?? false))
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Row(

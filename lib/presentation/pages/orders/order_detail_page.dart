@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -33,9 +34,107 @@ class OrderDetailPage extends ConsumerStatefulWidget {
 class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   bool _isProcessing = false;
   WebViewController? _mapWebViewController;
+  WebViewController? _previewMapWebViewController;
   bool _isMapLoading = true;
   bool _hasMapError = false;
+  bool _isPreviewMapLoading = true;
+  bool _hasPreviewMapError = false;
   String? _lastMapStatus; // Track status to detect changes
+
+  void _initPreviewMapWebView(OrderModel order) {
+    final url = Uri.parse('${AppConfig.webBaseUrl}/map/route').replace(queryParameters: {
+      'origin_lat': order.pickupLat.toString(),
+      'origin_lng': order.pickupLng.toString(),
+      'dest_lat': order.deliveryLat.toString(),
+      'dest_lng': order.deliveryLng.toString(),
+    });
+    _previewMapWebViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) {
+          if (mounted) setState(() => _isPreviewMapLoading = true);
+        },
+        onPageFinished: (_) {
+          if (mounted) setState(() => _isPreviewMapLoading = false);
+        },
+        onWebResourceError: (error) {
+          if (error.isForMainFrame ?? true) {
+            if (mounted) {
+              setState(() {
+                _hasPreviewMapError = true;
+                _isPreviewMapLoading = false;
+              });
+            }
+          }
+        },
+      ))
+      ..loadRequest(url);
+  }
+
+  Widget _buildPreviewRouteMap(OrderModel order, Color primary) {
+    if (_previewMapWebViewController == null) {
+      _initPreviewMapWebView(order);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Pratinjau Rute Peta'),
+        const SizedBox(height: 8),
+        Container(
+          height: 220,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              if (_previewMapWebViewController != null)
+                WebViewWidget(controller: _previewMapWebViewController!),
+              if (_isPreviewMapLoading)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    child: Center(child: CircularProgressIndicator(color: primary, strokeWidth: 2)),
+                  ),
+                ),
+              if (_hasPreviewMapError)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.grey.shade50,
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.map_outlined, size: 32, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('Gagal memuat peta', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 12, color: Colors.grey.shade500),
+            const SizedBox(width: 4),
+            const Expanded(
+              child: Text(
+                'Rute dari lokasi beli ke alamat pengantaran',
+                style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   /// Build map URL based on order status:
   /// - accepted/purchasing: origin = runner location, dest = pickup (go to store)
@@ -317,20 +416,184 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
 
 
+  String _sanitizePhone(String phone) {
+    var sanitized = phone.replaceAll(RegExp(r'\D'), '');
+    if (sanitized.startsWith('0')) {
+      sanitized = '62${sanitized.substring(1)}';
+    }
+    if (sanitized.startsWith('+')) {
+      sanitized = sanitized.replaceAll('+', '');
+    }
+    // Handle if still has leading 8 without 62 (after + removal)
+    if (sanitized.startsWith('8')) {
+      sanitized = '62$sanitized';
+    }
+    return sanitized;
+  }
+
   Future<void> _contactViaWhatsApp(String phone, String message) async {
-    // Sanitize phone number (remove spaces, leading zeros, etc.)
-    var sanitizedPhone = phone.replaceAll(RegExp(r'\D'), '');
-    if (sanitizedPhone.startsWith('0')) {
-      sanitizedPhone = '62${sanitizedPhone.substring(1)}';
-    }
-    
-    final url = Uri.parse('https://wa.me/$sanitizedPhone?text=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
+    final sanitizedPhone = _sanitizePhone(phone);
+    final encodedMsg = Uri.encodeComponent(message);
+
+    // 1. Try native whatsapp:// scheme
+    final whatsappScheme = Uri.parse('whatsapp://send?phone=$sanitizedPhone&text=$encodedMsg');
+    final waMeUrl = Uri.parse('https://wa.me/$sanitizedPhone?text=$encodedMsg');
+    final apiWaUrl = Uri.parse('https://api.whatsapp.com/send?phone=$sanitizedPhone&text=$encodedMsg');
+
+    try {
+      // Native app
+      if (await canLaunchUrl(whatsappScheme)) {
+        if (await launchUrl(whatsappScheme, mode: LaunchMode.externalApplication)) return;
+      }
+      // wa.me (universal link - will open WhatsApp if installed, else browser)
+      if (await canLaunchUrl(waMeUrl)) {
+        if (await launchUrl(waMeUrl, mode: LaunchMode.externalApplication)) return;
+      }
+      // api.whatsapp.com fallback
+      if (await canLaunchUrl(apiWaUrl)) {
+        if (await launchUrl(apiWaUrl, mode: LaunchMode.externalApplication)) return;
+      }
+    } catch (_) {}
+
+    // All failed -> guide to Play Store/App Store with WhatsApp search
+    if (!mounted) return;
+    await _showWhatsAppInstallDialog(sanitizedPhone);
+  }
+
+  Future<void> _showWhatsAppInstallDialog(String sanitizedPhone) async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('WhatsApp Tidak Terinstal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Sepertinya aplikasi WhatsApp belum terpasang di perangkat Anda.', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_rounded, size: 16, color: AppColors.textMuted),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(sanitizedPhone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Copy number
+              Clipboard.setData(ClipboardData(text: sanitizedPhone));
+              _showSnackBar('Nomor telepon disalin ke clipboard');
+            },
+            child: const Text('Salin Nomor'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _openWhatsAppStore();
+            },
+            icon: const Icon(Icons.shopping_bag_rounded, size: 16),
+            label: const Text('Buka Play Store'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openWhatsAppStore() async {
+    // Try Play Store search via market scheme, fallback to http
+    const marketSearch = 'market://search?q=whatsapp';
+    const playStoreSearchHttp = 'https://play.google.com/store/search?q=whatsapp&c=apps';
+    const appStoreSearch = 'https://apps.apple.com/search?term=whatsapp';
+
+    try {
+      final marketUri = Uri.parse(marketSearch);
+      if (await canLaunchUrl(marketUri)) {
+        if (await launchUrl(marketUri, mode: LaunchMode.externalApplication)) return;
+      }
+      // Fallback http Play Store search
+      final httpUri = Uri.parse(playStoreSearchHttp);
+      if (await canLaunchUrl(httpUri)) {
+        await launchUrl(httpUri, mode: LaunchMode.externalApplication);
+        return;
+      }
+      // iOS fallback
+      final iosUri = Uri.parse(appStoreSearch);
+      if (await canLaunchUrl(iosUri)) {
+        await launchUrl(iosUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
       if (!mounted) return;
-      _showSnackBar('Gagal membuka WhatsApp. Pastikan aplikasi WhatsApp terinstal.', isError: true);
+      _showSnackBar('Gagal membuka Play Store. Silakan cari WhatsApp secara manual di Play Store.', isError: true);
     }
+  }
+
+  Future<void> _makePhoneCall(String phone) async {
+    final sanitized = _sanitizePhone(phone);
+    final telUrl = Uri.parse('tel:$sanitized');
+    try {
+      if (await canLaunchUrl(telUrl)) {
+        if (await launchUrl(telUrl, mode: LaunchMode.externalApplication)) return;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Panggilan Gagal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Tidak dapat melakukan panggilan telepon langsung.', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(sanitized, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Clipboard.setData(ClipboardData(text: sanitized));
+              _showSnackBar('Nomor telepon disalin');
+            },
+            child: const Text('Salin Nomor'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -499,6 +762,8 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         _buildSectionTitle('Alamat & Rute Pengiriman'),
         const SizedBox(height: 8),
         _buildLocationDetails(order, primary),
+        const SizedBox(height: 16),
+        _buildPreviewRouteMap(order, primary),
         const SizedBox(height: 20),
 
         _buildSectionTitle('Rincian Pembayaran'),
@@ -1162,10 +1427,11 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   icon: Icons.phone_rounded,
                   label: 'Telepon',
                   color: primary,
-                  onTap: () async {
-                    final url = Uri.parse('tel:$phone');
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(url);
+                  onTap: () {
+                    if (phone.isNotEmpty) {
+                      _makePhoneCall(phone);
+                    } else {
+                      _showSnackBar('Nomor telepon tidak tersedia', isError: true);
                     }
                   },
                 ),
@@ -1600,14 +1866,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final url = Uri.parse('tel:$phone');
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      } else {
-                        _showSnackBar('Tidak dapat melakukan panggilan telepon langsung.', isError: true);
-                      }
-                    },
+                    onPressed: () => _makePhoneCall(phone),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: primary,
                       side: BorderSide(color: primary.withValues(alpha: 0.3)),
@@ -1747,7 +2006,24 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     final disputeBtn = _buildDisputeButton(order, isRequester);
 
     if (mainAction == null && cancelBtn == null && disputeBtn == null) {
-      return const SizedBox.shrink();
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/support/new?order_id=${order.id}'),
+            icon: const Icon(Icons.support_agent_rounded, size: 18),
+            label: const Text('Butuh Bantuan? Buat Tiket CS', style: TextStyle(fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: primary,
+              side: BorderSide(color: primary.withValues(alpha: 0.3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -1759,10 +2035,28 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         children: [
           if (mainAction != null) ...[
             mainAction,
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/support/new?order_id=${order.id}'),
+                icon: const Icon(Icons.support_agent_rounded, size: 18),
+                label: const Text('Butuh Bantuan? Buat Tiket CS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade700,
+                  side: BorderSide(color: Colors.grey.shade300),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
             if (cancelBtn != null || disputeBtn != null) const SizedBox(height: 8),
           ],
           if (cancelBtn != null) cancelBtn,
-          if (disputeBtn != null) disputeBtn,
+          if (disputeBtn != null) ...[
+            const SizedBox(height: 8),
+            disputeBtn,
+          ],
         ],
       ),
     );

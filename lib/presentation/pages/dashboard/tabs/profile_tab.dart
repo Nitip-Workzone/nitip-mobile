@@ -43,14 +43,28 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
 
   String? _getAvatarUrl(String? path) {
     if (path == null || path.isEmpty) return null;
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    // If path already contains avatars/ or uploads/, use as is with base URL
     try {
       final baseUri = Uri.parse(AppConfig.baseUrl);
       final hostUrl = "${baseUri.scheme}://${baseUri.host}:${baseUri.port}";
-      return "$hostUrl/uploads/$path";
+      // Handle if path already starts with / or uploads/
+      if (trimmed.startsWith('/') || trimmed.startsWith('avatars/') || trimmed.startsWith('uploads/')) {
+        final clean = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+        return "$hostUrl/$clean";
+      }
+      return "$hostUrl/uploads/$trimmed";
     } catch (_) {
-      return null;
+      return trimmed;
     }
+  }
+
+  String _getRoleLabel(User? user) {
+    if (user == null) return 'Pengguna';
+    if (user.isMerchant) return '🏪 Mitra Merchant';
+    if (user.isRunner) return '🏃 Runner';
+    return '📦 Penitip';
   }
 
   @override
@@ -169,8 +183,21 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          isRunner ? '🏃 Runner' : '📦 Penitip',
+                          _getRoleLabel(user),
                           style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // KYC status chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isVerified ? Colors.green.withValues(alpha: 0.9) : Colors.orange.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          isVerified ? 'Terverifikasi' : 'Belum Verifikasi',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -344,6 +371,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                     ),
                   ),
                   _MenuItem(
+                    icon: Icons.support_agent_rounded,
+                    label: 'Pusat Bantuan',
+                    color: Colors.blue,
+                    onTap: () => context.push('/support'),
+                  ),
+                  _MenuItem(
                     icon: Icons.lock_outline_rounded,
                     label: 'Keamanan (PIN)',
                     color: primary,
@@ -388,6 +421,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final whatsappController = TextEditingController(text: user?.whatsappNumber);
     final addressController = TextEditingController(text: user?.homeAddress);
     String? localAvatarPath;
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -445,11 +479,30 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                               right: 0,
                               child: GestureDetector(
                                 onTap: () async {
-                                  final picker = ImagePicker();
-                                  final pickedFile = await picker.pickImage(
-                                    source: ImageSource.gallery,
-                                    imageQuality: 80,
+                                  final source = await showModalBottomSheet<ImageSource>(
+                                    context: context,
+                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+                                    builder: (ctx) => SafeArea(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ListTile(
+                                            leading: const Icon(Icons.photo_library_rounded),
+                                            title: const Text('Pilih dari Galeri'),
+                                            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                                          ),
+                                          ListTile(
+                                            leading: const Icon(Icons.camera_alt_rounded),
+                                            title: const Text('Ambil Foto'),
+                                            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   );
+                                  if (source == null) return;
+                                  final picker = ImagePicker();
+                                  final pickedFile = await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1024, maxHeight: 1024);
                                   if (pickedFile != null) {
                                     sheetSetState(() {
                                       localAvatarPath = pickedFile.path;
@@ -551,26 +604,26 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                               return;
                             }
 
-                            Navigator.pop(context); // Close sheet
-                            
-                            // Show loading indicator overlay
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (_) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
+                            // Validation
+                            if (name.length < 2) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Nama minimal 2 karakter'), backgroundColor: Colors.orange),
+                              );
+                              return;
+                            }
+
+                            // Keep sheet open, show loading inside
+                            sheetSetState(() => isSaving = true);
 
                             try {
                               await ref.read(authProvider.notifier).updateProfile(
                                 name: name,
                                 whatsappNumber: wa,
-                                homeAddress: addr,
+                                homeAddress: addr.isEmpty ? null : addr,
                                 avatarPath: localAvatarPath,
                               );
                               if (context.mounted) {
-                                Navigator.pop(context); // Pop loading dialog
+                                Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     backgroundColor: primary,
@@ -579,8 +632,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                                 );
                               }
                             } catch (e) {
-                              if (context.mounted) {
-                                Navigator.pop(context); // Pop loading dialog
+                              if (mounted) {
+                                sheetSetState(() => isSaving = false);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     backgroundColor: Colors.red,
@@ -595,7 +648,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Simpan Perubahan', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: isSaving
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Simpan Perubahan', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

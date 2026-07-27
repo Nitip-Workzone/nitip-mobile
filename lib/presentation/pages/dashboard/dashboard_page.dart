@@ -9,6 +9,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/activity_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../providers/trip_provider.dart';
 import '../../../domain/models/order_model.dart';
 import '../orders/qr_scanner_page.dart';
 
@@ -35,9 +36,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       if (!mounted) return;
       ref.read(userLocationProvider.notifier).updateLocation();
       ref.read(activityProvider.notifier).fetchActivities();
+      ref.read(tripProvider.notifier).fetchMyTrips();
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +48,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         ref.read(walletProvider.notifier).fetchBalance();
         ref.read(notificationProvider.notifier).fetchUnreadCount();
         ref.read(activityProvider.notifier).fetchActivities();
+        ref.read(tripProvider.notifier).fetchMyTrips();
       }
+    });
+
+    // Listen trip state changes to sync heartbeat trip flag
+    ref.listen(tripProvider, (previous, next) {
+      final hasTrip = next.currentTrip != null;
+      ref.read(hasActiveTripProvider.notifier).state = hasTrip;
+      try {
+        ref.read(userLocationProvider.notifier).setHasActiveTrip(hasTrip);
+      } catch (_) {}
+    });
+
+    // Listen activity activeOrders count to re-evaluate heartbeat
+    ref.listen(activityProvider, (prev, next) {
+      try {
+        // Trigger evaluation via existing listener in location_provider (it watches activeOrders.length)
+        ref.read(userLocationProvider.notifier).setHasActiveTrip(ref.read(hasActiveTripProvider));
+      } catch (_) {}
     });
 
     final authState = ref.watch(authProvider);

@@ -16,6 +16,13 @@ abstract class AuthRepository {
   Future<void> changePin(String oldPin, String newPin);
   Future<void> updateAcceptingOrders(bool isAccepting);
   Future<void> updateLocation(double lat, double lng);
+  Future<void> sendHeartbeat({
+    required double lat,
+    required double lng,
+    String? tripId,
+    required int activeOrders,
+    required bool isForeground,
+  });
   Future<void> updateProfile({
     required String name,
     required String whatsappNumber,

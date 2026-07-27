@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/notification_provider.dart';
@@ -56,7 +57,34 @@ class NotificationPage extends ConsumerWidget {
                           if (!notif.isRead) {
                             ref.read(notificationProvider.notifier).markAsRead(notif.id);
                           }
-                          // Handle navigation based on type if needed
+                          // Deep link based on metadata — support type first
+                          final metadata = notif.metadata;
+                          if (metadata != null) {
+                            if (metadata['ticket_id'] != null) {
+                              final ticketId = metadata['ticket_id'].toString();
+                              context.push('/support/$ticketId');
+                              return;
+                            }
+                            if (metadata['order_id'] != null) {
+                              final orderId = metadata['order_id'].toString();
+                              context.push('/orders/detail/$orderId');
+                              return;
+                            }
+                          }
+                          switch (notif.type) {
+                            case 'support':
+                              context.push('/support');
+                              break;
+                            case 'wallet':
+                            case 'payment':
+                              context.push('/wallet/history');
+                              break;
+                            case 'order':
+                              context.push('/dashboard');
+                              break;
+                            default:
+                              break;
+                          }
                         },
                       );
                     },
@@ -111,6 +139,7 @@ class _NotificationTile extends StatelessWidget {
         color = Colors.blue;
         break;
       case 'payment':
+      case 'wallet':
         icon = Icons.account_balance_wallet_rounded;
         color = Colors.green;
         break;
@@ -121,6 +150,10 @@ class _NotificationTile extends StatelessWidget {
       case 'kyc':
         icon = Icons.verified_user_rounded;
         color = Colors.purple;
+        break;
+      case 'support':
+        icon = Icons.support_agent_rounded;
+        color = Colors.teal;
         break;
       default:
         icon = Icons.notifications_rounded;

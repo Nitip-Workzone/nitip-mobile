@@ -24,6 +24,9 @@ import 'presentation/pages/orders/explore_orders_page.dart';
 import 'presentation/pages/orders/order_detail_page.dart';
 import 'presentation/pages/dashboard/tabs/orders_tab.dart';
 import 'presentation/pages/reviews/submit_review_page.dart';
+import 'presentation/pages/support/support_ticket_list_page.dart';
+import 'presentation/pages/support/support_ticket_detail_page.dart';
+import 'presentation/pages/support/support_new_ticket_page.dart';
 
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/wallet_provider.dart';
@@ -113,6 +116,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/faq',
         builder: (context, state) => const FaqPage(),
+      ),
+      GoRoute(
+        path: '/support',
+        builder: (context, state) {
+          // lazy import to avoid circular
+          return const SupportTicketListPage();
+        },
+      ),
+      GoRoute(
+        path: '/support/new',
+        builder: (context, state) => SupportNewTicketPage(orderId: state.uri.queryParameters['order_id']),
+      ),
+      GoRoute(
+        path: '/support/:id',
+        builder: (context, state) => SupportTicketDetailPage(ticketId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/wallet/history',

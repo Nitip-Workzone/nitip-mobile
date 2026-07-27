@@ -111,11 +111,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> checkAuthStatus() async {
     try {
-      final config = await _repository.getPublicConfig();
-      AppConfig.isKycRequired = config['kyc_verification_required'] ?? false;
-      AppConfig.withdrawalSchedule = config['withdrawal_schedule'] ?? 'Setiap hari pukul 09:00 WITA';
-      debugPrint('[CONFIG] Dynamic KYC verification requirement set to: ${AppConfig.isKycRequired}');
-      debugPrint('[CONFIG] Dynamic withdrawal schedule set to: ${AppConfig.withdrawalSchedule}');
+      final cfg = await _repository.getPublicConfig();
+      AppConfig.isKycRequired = cfg['kyc_verification_required'] ?? false;
+      AppConfig.withdrawalSchedule = cfg['withdrawal_schedule'] ?? 'Setiap hari pukul 09:00 WITA';
+      final codRaw = cfg['cod_enabled'];
+      if (codRaw is bool) {
+        AppConfig.isCodEnabled = codRaw;
+      } else if (codRaw is String) {
+        AppConfig.isCodEnabled = codRaw.toLowerCase() == 'true';
+      } else if (cfg.containsKey('cod_enabled')) {
+        AppConfig.isCodEnabled = false;
+      }
+      debugPrint('[CONFIG] Dynamic KYC: ${AppConfig.isKycRequired}, withdrawal: ${AppConfig.withdrawalSchedule}, COD enabled: ${AppConfig.isCodEnabled}');
     } catch (e) {
       debugPrint('[CONFIG] Failed to load public config from backend: $e');
     }
