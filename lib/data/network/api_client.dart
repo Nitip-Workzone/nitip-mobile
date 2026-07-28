@@ -43,26 +43,15 @@ class ApiClient {
         final token = await _storage.read(key: 'access_token');
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
-          debugPrint('[API_DEBUG] Request: ${options.method} ${options.path} | Token found');
-        } else {
-          debugPrint('[API_DEBUG] Request: ${options.method} ${options.path} | NO TOKEN FOUND in storage');
         }
         return handler.next(options);
       },
-    ));
-
-    // Tambahkan logger sederhana untuk debug
-    dio.interceptors.add(LogInterceptor(
-      requestBody: false,
-      responseBody: false,
-      logPrint: (o) => debugPrint(o.toString()),
     ));
 
     // Handle 401 errors for token refresh
     dio.interceptors.add(InterceptorsWrapper(
       onError: (e, handler) async {
         if (e.response?.statusCode == 401) {
-          debugPrint('[API_DEBUG] 401 Unauthorized detected. Attempting refresh...');
           final refreshToken = await _storage.read(key: 'refresh_token');
           if (refreshToken != null) {
             try {
@@ -88,7 +77,6 @@ class ApiClient {
               ));
 
               final refreshUrl = '${AppConfig.baseUrl}auth/refresh';
-              debugPrint('[API_DEBUG] POST $refreshUrl (with grant token)');
 
               final response = await refreshDio.post(
                 refreshUrl,
@@ -102,7 +90,6 @@ class ApiClient {
                 // Save new tokens
                 await _storage.write(key: 'access_token', value: newAccessToken);
                 await _storage.write(key: 'refresh_token', value: newRefreshToken);
-                debugPrint('[API_DEBUG] Token refresh successful.');
 
                 // Retry original request
                 final opts = e.requestOptions;
@@ -112,11 +99,8 @@ class ApiClient {
                 return handler.resolve(retryResponse);
               }
             } on DioException catch (refreshErr) {
-              debugPrint('[API_DEBUG] Token refresh failed: ${refreshErr.response?.statusCode} - ${refreshErr.message}');
-
               // Hanya hapus token jika server mengembalikan 401 atau 400 (token tidak valid/expired)
               if (refreshErr.response?.statusCode == 401 || refreshErr.response?.statusCode == 400) {
-                debugPrint('[API_DEBUG] Refresh token invalid/expired. Clearing session.');
                 await _clearSession();
                 if (onSessionExpired != null) {
                   try {
@@ -124,8 +108,7 @@ class ApiClient {
                   } catch (_) {}
                 }
               }
-            } catch (e) {
-              debugPrint('[API_DEBUG] Unexpected error during refresh: $e');
+            } catch (_) {
               // Fail-safe: clear + expire on unexpected error during refresh to avoid infinite loop
               await _clearSession();
               if (onSessionExpired != null) {
@@ -135,7 +118,6 @@ class ApiClient {
               }
             }
           } else {
-            debugPrint('[API_DEBUG] No refresh token found. User must re-login.');
             await _clearSession();
             if (onSessionExpired != null) {
               try {

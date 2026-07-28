@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/config/app_config.dart';
@@ -226,7 +225,6 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
         'delivery_name': state.deliveryName,
       };
 
-      debugPrint("[DEBUG] Payload: $payload");
       await _orderRepo.createOrder(payload);
       _ref.read(activityProvider.notifier).fetchActivities();
       state = state.copyWith(isLoading: false);

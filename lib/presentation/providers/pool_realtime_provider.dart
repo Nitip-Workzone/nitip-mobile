@@ -73,12 +73,9 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
     // Listen to pool events
     final svc = _ref.read(poolRealtimeServiceProvider);
     _sub = svc.stream.listen((ev) {
-      debugPrint('[POOL_PROVIDER] event ${ev.type} ${ev.orderId}');
       if (_disposed) return;
 
       if (ev.type == 'order_created') {
-        // New order -> fetch to stay consistent (pool snapshot logic server-side)
-        // Debounce: don't fetch more than once per 1s
         _debouncedFetch();
         state = state.copyWith(
           isLive: true,
@@ -88,7 +85,6 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
           ev.type == 'order_cancelled' ||
           ev.type == 'order_expired' ||
           ev.type == 'order_completed') {
-        // Remove from local list without full fetch (fast UI)
         if (ev.orderId != null) {
           final cur = _ref.read(exploreOrdersProvider).availableOrders;
           final filtered = cur.where((o) => o.id != ev.orderId).toList();
@@ -100,7 +96,6 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
         state = state.copyWith(lastUpdate: _formatNow());
       } else if (ev.type == 'connected') {
         state = state.copyWith(isLive: true, isConnecting: false, reconnectAttempts: 0, lastUpdate: _formatNow());
-        // On reconnect, sync once
         _debouncedFetch();
       }
     });
@@ -114,7 +109,6 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
       if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
       final svc = _ref.read(poolRealtimeServiceProvider);
       if (!svc.isRunning && !state.isLive) {
-        debugPrint('[POOL_PROVIDER] fallback fetch (SSE not live)');
         _ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders();
       }
     });
@@ -133,8 +127,6 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
     if (_disposed || !_shouldRun) return;
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed &&
         WidgetsBinding.instance.lifecycleState != null) {
-      // Don't connect in background
-      debugPrint('[POOL_PROVIDER] skip connect, app not resumed');
       return;
     }
 
@@ -142,17 +134,13 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
       final locationService = _ref.read(userLocationProvider.notifier).locationService;
       final pos = await locationService.getCurrentPosition().timeout(const Duration(seconds: 8));
       if (pos == null) {
-        debugPrint('[POOL_PROVIDER] no location');
         _scheduleReconnect();
         return;
       }
 
-      // Throttle: only reconnect if moved >100m
       if (_lastLat != null && _lastLng != null) {
         final distM = _calculateDistance(_lastLat!, _lastLng!, pos.latitude, pos.longitude) * 1000;
         if (distM < 100) {
-          debugPrint('[POOL_PROVIDER] moved <100m, keep existing connection');
-          // Already connected? If not, connect
           final svc = _ref.read(poolRealtimeServiceProvider);
           if (svc.isRunning) return;
         }
@@ -163,12 +151,9 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
 
       state = state.copyWith(isConnecting: true);
       final svc = _ref.read(poolRealtimeServiceProvider);
-      debugPrint('[POOL_PROVIDER] connecting SSE lat=${pos.latitude} lng=${pos.longitude}');
       await svc.connect(lat: pos.latitude, lng: pos.longitude, radiusKm: 15);
-      // connect() returns when disconnected
       state = state.copyWith(isLive: false, isConnecting: false);
-    } catch (e) {
-      debugPrint('[POOL_PROVIDER] connect error $e');
+    } catch (_) {
       state = state.copyWith(isLive: false, isConnecting: false);
     }
 
@@ -181,14 +166,11 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
     if (!_shouldRun || _disposed) return;
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed &&
         WidgetsBinding.instance.lifecycleState != null) {
-      debugPrint('[POOL_PROVIDER] not scheduling reconnect, app not resumed');
       return;
     }
     final attempt = state.reconnectAttempts;
     final jitter = (DateTime.now().millisecondsSinceEpoch % 500);
-    // Exponential backoff: 1s,2s,4s,8s,16s, max 30s
     final backoffMs = (1000 * (1 << (attempt < 5 ? attempt : 5)) + jitter).clamp(1000, 30000);
-    debugPrint('[POOL_PROVIDER] schedule reconnect in ${backoffMs}ms attempt=$attempt');
     _reconnectTimer = Timer(Duration(milliseconds: backoffMs), () {
       if (_disposed || !_shouldRun) return;
       state = state.copyWith(reconnectAttempts: attempt + 1);
@@ -198,7 +180,6 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    debugPrint('[POOL_PROVIDER] lifecycle $state');
     if (_disposed) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       // Best practice: disconnect when backgrounded to save battery & radio

@@ -26,10 +26,28 @@
 -keep class com.baseflow.geolocator.** { *; }
 -keep class com.baseflow.geocoding.** { *; }
 
-# WebView
+# WebView — CRITICAL for merchant WebView in build-apk-wa (was causing 500 if R8 stripped channel)
+# webview_flutter native side needs these kept, otherwise addJavaScriptChannel NitipLogout stops working
 -keep class com.pichillilorenzo.flutter_inappwebview.** { *; }
 -keep class io.flutter.plugins.webviewflutter.** { *; }
 -keep class com.example.webview_flutter_wkwebview.** { *; }
+-keep class androidx.webkit.** { *; }
+-keep class android.webkit.** { *; }
+-keep class android.webkit.WebView { *; }
+-keep class android.webkit.WebViewClient { *; }
+-keep class android.webkit.WebChromeClient { *; }
+-keep class android.webkit.JavascriptInterface { *; }
+-keepclassmembers class * {
+  @android.webkit.JavascriptInterface <methods>;
+}
+# WebView Flutter plugin internal (flutter_inappwebview + webview_flutter_android)
+-keep class com.itznotabug.flutter.usage_stats.** { *; }
+-keep class io.flutter.plugins.webviewflutter.** { *; }
+-keep class io.flutter.plugins.webviewflutter.WebViewFlutterPlugin { *; }
+-keep class io.flutter.plugins.imagepicker.** { *; }
+-keep class android.webkit.WebView { *; }
+# Keep cookie manager for auth_token injection BEFORE loadRequest (fix 500)
+-keep class android.webkit.CookieManager { *; }
 
 # Device Info, URL Launcher, Local Auth, etc
 -keep class com.example.device_info_plus.** { *; }

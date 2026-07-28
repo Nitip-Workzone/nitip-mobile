@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/config/app_config.dart';
 
@@ -48,7 +47,6 @@ class PoolRealtimeService {
       final token = await storage.read(key: 'access_token');
       if (token == null || token.isEmpty) {
         _running = false;
-        debugPrint('[POOL_SSE] No token, abort');
         return;
       }
 
@@ -61,8 +59,6 @@ class PoolRealtimeService {
       // EventSource via query param token (middleware supports ?token=, since EventSource can't set Authorization header)
       final url =
           '${AppConfig.baseUrl}orders/pool/stream?lat=$lat&lng=$lng&radius=$radiusKm&token=${Uri.encodeComponent(token)}';
-
-      debugPrint('[POOL_SSE] Connecting $url');
 
       final resp = await dio.get<ResponseBody>(
         url,
@@ -100,9 +96,6 @@ class PoolRealtimeService {
             if (line.isEmpty) continue;
             if (line.startsWith(':')) {
               // comment / heartbeat from server
-              if (line.contains('heartbeat')) {
-                debugPrint('[POOL_SSE] heartbeat');
-              }
               continue;
             }
             if (line.startsWith('event:')) {
@@ -122,22 +115,17 @@ class PoolRealtimeService {
             // Only forward meaningful events (skip heartbeat if parsed as event)
             if (ev.type == 'heartbeat') continue;
             _controller.add(ev);
-          } catch (e) {
-            debugPrint('[POOL_SSE] parse error: $e data=$dataStr');
+          } catch (_) {
+            // ignore parse errors
           }
         }
       }
-    } on DioException catch (e) {
-      if (CancelToken.isCancel(e)) {
-        debugPrint('[POOL_SSE] cancelled');
-      } else {
-        debugPrint('[POOL_SSE] Dio error: ${e.message} type=${e.type}');
-      }
-    } catch (e) {
-      debugPrint('[POOL_SSE] error: $e');
+    } on DioException catch (_) {
+      // cancelled or network error — will reconnect via provider backoff
+    } catch (_) {
+      // generic error
     } finally {
       _running = false;
-      debugPrint('[POOL_SSE] disconnected');
     }
   }
 
