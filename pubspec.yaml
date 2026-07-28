@@ -27,14 +27,12 @@ dependencies:
   # Local Storage (JWT Security)
   flutter_secure_storage: ^10.0.0
 
-  # UI & Icons
-  google_fonts: ^8.1.0
-  flutter_svg: ^2.0.10
+  # UI & Icons - optimized: google_fonts removed (use bundled fonts), flutter_svg removed (unused)
   device_info_plus: ^12.4.0
-  # Camera & Permissions
-  camera: ^0.12.0+1
+  # Camera & Permissions - optimized: camera removed, use image_picker only (WebView kept per strategy)
   permission_handler: ^12.0.1
   image_picker: ^1.1.2
+  latlong2: ^0.9.1
   # Localization & Utils
   intl: ^0.20.2
   uuid: ^4.3.3
@@ -44,7 +42,6 @@ dependencies:
   cached_network_image: ^3.4.0
   local_auth: ^2.3.0
   connectivity_plus: ^7.1.1
-  latlong2: any
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   url_launcher: ^6.2.5
@@ -88,4 +85,11 @@ flutter:
   
   assets:
     - assets/images/
-    - assets/images/providers/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-Black.ttf
+          weight: 900

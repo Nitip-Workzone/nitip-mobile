@@ -45,7 +45,17 @@ class ExploreOrdersNotifier extends StateNotifier<ExploreOrdersState> {
       }
 
       final orders = await _orderRepo.getAvailableOrders();
-      state = state.copyWith(isLoading: false, availableOrders: orders);
+      // Defensive filter: only actionable statuses should appear in pool
+      // Backend should already filter, but keep UI safe if backend leaks
+      const allowedStatuses = {
+        'pending',
+        'merchant_accepted',
+        'accepted',
+        'cooking',
+        'ready',
+      };
+      final filtered = orders.where((o) => allowedStatuses.contains(o.status.toLowerCase())).toList();
+      state = state.copyWith(isLoading: false, availableOrders: filtered);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

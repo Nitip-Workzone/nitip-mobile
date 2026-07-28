@@ -130,30 +130,46 @@ set-gps-lolak:
 # Default production build target (AAB for Play Store)
 build-android: build-aab
 
-# Build production APK (sideload / direct install)
+# Build production APK (sideload / direct install) - optimized Phase 1+2
+# --obfuscate + --split-debug-info: smaller + secure
+# --split-per-abi: 1 ABI per APK (arm64-v8a is 95% of devices) = ~40% smaller download
 build-apk:
-	@echo "🔨 Building Nitip APK (Production)..."
+	@echo "🔨 Building Nitip APK (Production Optimized - Phase1+2)..."
 	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
 	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
 	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
+	@echo "   Flags    : --obfuscate --split-debug-info --split-per-abi"
 	@echo ""
+	@mkdir -p build/symbols
 	@rm -rf build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
-	@$(FLUTTER) build apk --release --dart-define-from-file=env.json
+	@$(FLUTTER) build apk --release --obfuscate --split-debug-info=build/symbols --split-per-abi --dart-define-from-file=env.json
 	@echo ""
-	@echo "✅ APK built successfully!"
-	@echo "📦 Output: build/app/outputs/flutter-apk/app-release.apk"
+	@echo "✅ APKs built successfully (per ABI)!"
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo ""
+	@echo "   Use app-arm64-v8a-release.apk for most devices (smallest & fastest)"
+
+build-apk-fat:
+	@echo "🔨 Building Fat APK (all ABIs, legacy)..."
+	@mkdir -p build/symbols
+	@$(FLUTTER) build apk --release --obfuscate --split-debug-info=build/symbols --dart-define-from-file=env.json
 	@ls -lh build/app/outputs/flutter-apk/app-release.apk 2>/dev/null || true
 
-# Build production AAB (Google Play Store)
+# Build production AAB (Google Play Store) - optimized
 build-aab:
-	@echo "🔨 Building Nitip App Bundle (Production)..."
+	@echo "🔨 Building Nitip App Bundle (Production Optimized)..."
 	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
 	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
 	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
 	@echo ""
+	@mkdir -p build/symbols
 	@rm -rf build/app/outputs/bundle/release/*.aab 2>/dev/null || true
-	@$(FLUTTER) build appbundle --release --dart-define-from-file=env.json
+	@$(FLUTTER) build appbundle --release --obfuscate --split-debug-info=build/symbols --dart-define-from-file=env.json
 	@echo ""
 	@echo "✅ App Bundle built successfully!"
 	@echo "📦 Output: build/app/outputs/bundle/release/app-release.aab"
 	@ls -lh build/app/outputs/bundle/release/app-release.aab 2>/dev/null || true
+
+size:
+	@echo "📊 Analyzing APK size breakdown..."
+	@$(FLUTTER) build apk --analyze-size --release --dart-define-from-file=env.json 2>&1 | tail -n 100

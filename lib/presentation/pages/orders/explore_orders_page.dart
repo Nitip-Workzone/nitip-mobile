@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../domain/models/order_model.dart';
 import '../../providers/explore_orders_provider.dart';
 import '../../providers/activity_provider.dart';
+import '../../providers/pool_realtime_provider.dart';
 import '../../widgets/orders/order_card.dart';
 
 class ExploreOrdersPage extends ConsumerStatefulWidget {
@@ -24,6 +25,9 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
     Future.microtask(() {
       ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders();
       ref.read(activityProvider.notifier).fetchActivities();
+      // Start realtime pool SSE (best practice: lifecycle-aware inside provider)
+      // Will auto-disconnect when backgrounded to save battery
+      ref.read(poolRealtimeProvider.notifier);
     });
   }
 
@@ -37,6 +41,7 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
   Widget build(BuildContext context) {
     final state = ref.watch(exploreOrdersProvider);
     final activityState = ref.watch(activityProvider);
+    final poolState = ref.watch(poolRealtimeProvider);
     
     final activeOrders = activityState.activeOrders;
     final availableOrders = state.availableOrders;
@@ -44,9 +49,51 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Kelola Tugas & Order',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textMain),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Kelola Tugas & Order',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textMain),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: poolState.isLive ? Colors.green.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: poolState.isLive ? Colors.green.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6, height: 6,
+                    decoration: BoxDecoration(
+                      color: poolState.isLive ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    poolState.isLive ? 'Live' : (poolState.isConnecting ? 'Conn...' : 'Poll'),
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: poolState.isLive ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (poolState.lastUpdate != null) ...[
+              const SizedBox(width: 4),
+              Text(
+                poolState.lastUpdate!,
+                style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
+              ),
+            ],
+          ],
         ),
         centerTitle: true,
         elevation: 0,
@@ -165,6 +212,11 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
   }
 
   Widget _buildAvailableOrderItem(OrderModel order, bool isLoading) {
+    // Extra safety: never render completed/cancelled/expired in pool
+    const blocked = {'completed', 'cancelled', 'expired', 'disputed'};
+    if (blocked.contains(order.status.toLowerCase())) {
+      return const SizedBox.shrink();
+    }
     return Column(
       children: [
         OrderCard(

@@ -1,27 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  static const String _fontFamily = 'Inter';
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: _fontFamily,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
         surface: AppColors.surface,
       ),
       scaffoldBackgroundColor: AppColors.background,
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        displayLarge: GoogleFonts.inter(
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+          fontFamily: _fontFamily,
           fontSize: 30,
           fontWeight: FontWeight.w900,
           color: AppColors.textMain,
           letterSpacing: -0.5,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: TextStyle(
+          fontFamily: _fontFamily,
           fontSize: 18,
           fontWeight: FontWeight.bold,
+          color: AppColors.textMain,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: _fontFamily,
+          fontSize: 14,
           color: AppColors.textMain,
         ),
       ),
