@@ -59,6 +59,21 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            if (mounted) setState(() => _isLoading = true);
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _isLoading = false);
+          },
+          onWebResourceError: (error) {
+            if (error.description.contains('500') || error.description.contains('Gangguan')) {
+              if (mounted) setState(() => _isLoading = false);
+            }
+          },
+        ),
+      )
       ..addJavaScriptChannel(
         'LocationChannel',
         onMessageReceived: (JavaScriptMessage message) {

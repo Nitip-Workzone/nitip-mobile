@@ -1,0 +1,12 @@
+# Copy file ini menjadi android/key.properties (JANGAN commit key.properties asli!)
+# Taruh nitip-release.jks di android/app/ atau path lain
+
+storeFile=/home/cherryapple/Documents/Codecoffy/nitip/nitip-flutter-mobile/android/app/nitip-release.jks
+storePassword=CHANGE_ME_STRONG_PASSWORD
+keyAlias=nitip
+keyPassword=CHANGE_ME_STRONG_PASSWORD
+
+# Cara generate keystore (sekali saja, backup aman):
+# keytool -genkey -v -keystore android/app/nitip-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias nitip
+# Isi: CN=PT Nitip, OU=Mobile, O=Nitip, L=Jakarta, ST=DKI, C=ID
+# Simpan jks + password di 1Password / secret manager, jangan di git

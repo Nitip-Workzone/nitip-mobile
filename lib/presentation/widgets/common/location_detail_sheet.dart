@@ -26,6 +26,8 @@ class LocationDetailSheet extends StatefulWidget {
 class _LocationDetailSheetState extends State<LocationDetailSheet> {
   late final WebViewController _webViewController;
   bool _copiedCoords = false;
+  bool _hasWebViewError = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -41,6 +43,33 @@ class _LocationDetailSheetState extends State<LocationDetailSheet> {
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            if (mounted) setState(() { _isLoading = true; _hasWebViewError = false; });
+          },
+          onPageFinished: (pageUrl) {
+            if (mounted) setState(() => _isLoading = false);
+            // Detect Nuxt error page "Terjadi Gangguan Pada Server" via JS title check
+            _webViewController.runJavaScript("""
+              (function(){
+                var title = document.title || '';
+                var body = document.body ? document.body.innerText : '';
+                if (title.includes('Gangguan') || body.includes('Terjadi Gangguan Pada Server') || body.includes('500') && body.includes('Server')) {
+                  console.log('[LocationDetailSheet] Detected error page');
+                  if (window.flutter_inappwebview) {}
+                  // Notify via channel if needed
+                }
+              })();
+            """);
+          },
+          onWebResourceError: (error) {
+            if (error.description.contains('500') || error.description.contains('Internal Server Error') || error.description.contains('Gangguan')) {
+              if (mounted) setState(() { _hasWebViewError = true; _isLoading = false; });
+            }
+          },
+        ),
+      )
       ..loadRequest(url);
   }
 
@@ -183,32 +212,86 @@ class _LocationDetailSheetState extends State<LocationDetailSheet> {
             ),
           ),
 
-          // Interactive Map Area
+          // Interactive Map Area - with error fallback for 500 "Terjadi Gangguan Pada Server"
           Expanded(
             child: Stack(
               children: [
-                WebViewWidget(
-                  controller: _webViewController,
-                  gestureRecognizers: {
-                    Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
-                  },
-                ),
+                if (!_hasWebViewError)
+                  WebViewWidget(
+                    controller: _webViewController,
+                    gestureRecognizers: {
+                      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                    },
+                  )
+                else
+                  Container(
+                    color: Colors.white,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.orange),
+                        const SizedBox(height: 12),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            'Peta web.nihtip.com sedang gangguan (500)\nGunakan Google Maps sementara',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() { _hasWebViewError = false; _isLoading = true; });
+                            final colorHex = (widget.primaryColor.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
+                            final url = Uri.parse('${AppConfig.webBaseUrl}/map/viewer').replace(
+                              queryParameters: {
+                                'lat': widget.location.latitude.toString(),
+                                'lng': widget.location.longitude.toString(),
+                                'color': colorHex,
+                              },
+                            );
+                            _webViewController.loadRequest(url);
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Coba Lagi'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: widget.primaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _openInGoogleMaps,
+                          icon: const Icon(Icons.map_rounded, size: 18),
+                          label: const Text('Buka Google Maps'),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (_isLoading && !_hasWebViewError)
+                  const Positioned(
+                    top: 0, left: 0, right: 0,
+                    child: LinearProgressIndicator(minHeight: 3),
+                  ),
 
                 // Map Actions Overlay
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton(
-                    mini: true,
-                    backgroundColor: Colors.white,
-                    foregroundColor: widget.primaryColor,
-                    elevation: 4,
-                    onPressed: () => _webViewController.runJavaScript(
-                      'if (typeof moveMap === "function") { moveMap(${widget.location.latitude}, ${widget.location.longitude}); }',
+                if (!_hasWebViewError)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton(
+                      mini: true,
+                      backgroundColor: Colors.white,
+                      foregroundColor: widget.primaryColor,
+                      elevation: 4,
+                      onPressed: () => _webViewController.runJavaScript(
+                        'if (typeof moveMap === "function") { moveMap(${widget.location.latitude}, ${widget.location.longitude}); }',
+                      ),
+                      child: const Icon(Icons.my_location),
                     ),
-                    child: const Icon(Icons.my_location),
                   ),
-                ),
               ],
             ),
           ),

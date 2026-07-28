@@ -24,23 +24,72 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
-# Environment Configuration
-env.json
 
+# ===============================
+# ENVIRONMENT & SECRETS - JANGAN COMMIT!
+# ===============================
+# Env contains BASE_URL, API_KEY, API_SECRET
+env.json
+.env
+.env.*
+!.env.example
+**/env.json
+**/.env
+
+# Release keystore - JANGAN COMMIT!
+android/key.properties
+**/key.properties
+android/app/*.jks
+android/app/*.keystore
+android/*.jks
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+*.pem
+*.key
+secret.txt
+**/secret.txt
+
+# Firebase - JANGAN COMMIT!
+android/app/google-services.json
+**/google-services.json
+**/GoogleService-Info.plist
+**/*firebase-adminsdk*.json
+**/*service-account*.json
+**/firebase-credentials.json
+ios/GoogleService-Info.plist
+ios/firebase_app_id_file.json
+
+# API Credentials
+**/credentials.json
+**/*credentials*.json
+
+# Build & Tool cache
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
+build/
+ios/Pods/
+android/.gradle/
+android/app/build/
 
-# Symbolication related
+# Symbolication related - JANGAN COMMIT (bisa reverse engineer)
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
+build/symbols/
+symbols.zip
 
 # Android Studio will place build artifacts here
+# User data
+user_data/
+test_dio.dart
+*.aab
+*.apk
+!**/testdata/**.apk
 /android/app/debug
 /android/app/profile
 /android/app/release

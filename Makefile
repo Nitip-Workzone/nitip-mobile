@@ -24,10 +24,21 @@ help:
 	@echo "  make update    - Update Flutter SDK and dependencies"
 	@echo "  make quiet-logs - Silence noisy EGL emulation logs (Android)"
 	@echo ""
-	@echo "  Production Android Builds:"
-	@echo "  make build-apk      - Build production APK (release)"
-	@echo "  make build-aab      - Build production AAB (Play Store)"
-	@echo "  make build-android  - Same as build-aab (default production build)"
+	@echo "  Production Android Builds (NORMAL - obfuscated, signed, small):"
+	@echo "  make build-apk          - NORMAL: split-per-abi release 3 APKs (36MB arm64 recommended for WA)"
+	@echo "  make build-apk-wa       - NORMAL: arm64 only 36MB (WA sharing)"
+	@echo "  make build-apk-fat      - NORMAL: fat universal 80MB"
+	@echo "  make build-aab          - NORMAL: AAB for Play Store"
+	@echo "  make build-android      - Same as build-aab"
+	@echo ""
+	@echo "  Debug Android Builds (with visible log overlay in HP):"
+	@echo "  make build-apk-debug        - DEBUG: arm64 debug 106MB with bug icon overlay to see WebView logs"
+	@echo "  make build-apk-debug-fat    - DEBUG: fat debug universal"
+	@echo "  make build-apk-release-noobfs - RELEASE no-obfuscate (test if 500 due to R8)"
+	@echo ""
+	@echo "  Flags:"
+	@echo "  NORMAL = --release --obfuscate --split-debug-info --split-per-abi + minify + shrink (signed CN=Nihtip.com)"
+	@echo "  DEBUG  = --debug --split-per-abi (no obfuscate, ada overlay debug log di merchant page)"
 
 emu:
 	@echo "Selecting emulator..."
@@ -133,42 +144,115 @@ build-android: build-aab
 # Build production APK (sideload / direct install) - optimized Phase 1+2
 # --obfuscate + --split-debug-info: smaller + secure
 # --split-per-abi: 1 ABI per APK (arm64-v8a is 95% of devices) = ~40% smaller download
+# =========================================================
+# APK BUILD FLAGS - Pisah Normal vs Debug
+# Normal (Release): obfuscate + split-debug-info + split-per-abi + minify + shrink (aman, kecil, signed)
+# Debug: tanpa obfuscate, tanpa tree-shake-icons, ada debug log overlay di WebView, bisa lihat log di HP
+# =========================================================
+
+# Build production APK (sideload / direct install via WA) - NORMAL RELEASE (Optimized)
+# Untuk share via WA, pakai arm64-v8a untuk HP baru, fat untuk universal
 build-apk:
-	@echo "🔨 Building Nitip APK (Production Optimized - Phase1+2)..."
+	@echo "🔨 Building Nitip APK (NORMAL RELEASE - Production Optimized)..."
 	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
 	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
 	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
-	@echo "   Flags    : --obfuscate --split-debug-info --split-per-abi"
+	@echo "   Flags    : NORMAL = --release --obfuscate --split-debug-info --split-per-abi + minify + shrink"
 	@echo ""
+	@echo "🧹 Cleaning old builds..."
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@rm -rf build/app/outputs/apk/ 2>/dev/null || true
+	@rm -rf build/symbols/* 2>/dev/null || true
 	@mkdir -p build/symbols
-	@rm -rf build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo "   Old APKs cleaned."
 	@$(FLUTTER) build apk --release --obfuscate --split-debug-info=build/symbols --split-per-abi --dart-define-from-file=env.json
 	@echo ""
-	@echo "✅ APKs built successfully (per ABI)!"
+	@echo "✅ APKs built successfully (per ABI) - NORMAL RELEASE - CLEAN BUILD!"
 	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
 	@echo ""
-	@echo "   Use app-arm64-v8a-release.apk for most devices (smallest & fastest)"
+	@echo "   📱 Untuk WA (Recommended):"
+	@echo "   - HP baru (2020+): app-arm64-v8a-release.apk (36MB, paling kecil & cepat) <- pakai ini untuk WA"
+	@echo "   - HP lama 32-bit: app-armeabi-v7a-release.apk (32MB)"
+	@echo "   - Universal (semua HP tapi besar): build-apk-fat -> app-release.apk (80MB)"
+	@echo ""
+	@echo "   Kirim via WA sebagai Document (bukan Gallery) agar tidak corrupt!"
 
 build-apk-fat:
-	@echo "🔨 Building Fat APK (all ABIs, legacy)..."
+	@echo "🔨 Building Fat APK (NORMAL - all ABIs, universal - 80MB, untuk WA jika tidak tau HP user)..."
+	@echo "🧹 Cleaning old fat APK..."
+	@rm -rf build/app/outputs/flutter-apk/app-release.apk 2>/dev/null || true
 	@mkdir -p build/symbols
 	@$(FLUTTER) build apk --release --obfuscate --split-debug-info=build/symbols --dart-define-from-file=env.json
+	@echo "✅ Fat APK built (NORMAL universal)!"
 	@ls -lh build/app/outputs/flutter-apk/app-release.apk 2>/dev/null || true
+	@echo "   Share via WA Document (bukan Gallery) -> 80MB"
 
-# Build production AAB (Google Play Store) - optimized
+# Build production AAB (Google Play Store) - NORMAL
 build-aab:
-	@echo "🔨 Building Nitip App Bundle (Production Optimized)..."
+	@echo "🔨 Building Nitip App Bundle (NORMAL - Production Optimized)..."
 	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
 	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
 	@echo "   Version  : $$(grep '^version:' pubspec.yaml | awk '{print $$2}')"
 	@echo ""
+	@echo "🧹 Cleaning old AAB..."
+	@rm -rf build/app/outputs/bundle/release/ 2>/dev/null || true
 	@mkdir -p build/symbols
-	@rm -rf build/app/outputs/bundle/release/*.aab 2>/dev/null || true
 	@$(FLUTTER) build appbundle --release --obfuscate --split-debug-info=build/symbols --dart-define-from-file=env.json
 	@echo ""
-	@echo "✅ App Bundle built successfully!"
+	@echo "✅ App Bundle built successfully (NORMAL)!"
 	@echo "📦 Output: build/app/outputs/bundle/release/app-release.aab"
 	@ls -lh build/app/outputs/bundle/release/app-release.aab 2>/dev/null || true
+
+# WA single ABI for sharing - NORMAL
+build-apk-wa:
+	@echo "📦 Building APK for WhatsApp sharing (NORMAL - arm64 only, smallest)..."
+	@echo "🧹 Cleaning..."
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@mkdir -p build/symbols
+	@$(FLUTTER) build apk --release --obfuscate --split-debug-info=build/symbols --target-platform android-arm64 --dart-define-from-file=env.json
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo ""
+	@echo "✅ NORMAL Release - Siap kirim via WA Document: app-arm64-v8a-release.apk (36MB)"
+
+# =========================================================
+# DEBUG BUILDS - Dengan log visible di HP (WebView debug overlay)
+# =========================================================
+
+# Debug APK for WA - with visible debug log overlay (no obfuscate, has bug icon debug)
+build-apk-debug:
+	@echo "🐛 Building APK DEBUG (with log visible di HP - untuk debug WebView 500)..."
+	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
+	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
+	@echo "   Flags    : DEBUG = --debug --split-per-abi (no obfuscate, ada overlay debug log)"
+	@echo ""
+	@echo "🧹 Cleaning..."
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@$(FLUTTER) build apk --debug --split-per-abi --target-platform android-arm64 --dart-define-from-file=env.json
+	@echo ""
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo ""
+	@echo "✅ DEBUG APK built - Ada bug icon di AppBar merchant untuk lihat log live!"
+	@echo "   Install: adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk"
+
+# Debug APK universal fat - for testing prod 500 issue without obfuscate
+build-apk-debug-fat:
+	@echo "🐛 Building Fat DEBUG APK (universal, no obfuscate)..."
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@$(FLUTTER) build apk --debug --dart-define-from-file=env.json
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo "✅ Fat DEBUG APK built"
+
+# Release but no obfuscate - untuk test apakah prod 500 karena R8/obfuscate
+build-apk-release-noobfs:
+	@echo "📦 Building APK RELEASE NO-OBFUSCATE (test if 500 due to R8)..."
+	@echo "🧹 Cleaning..."
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@mkdir -p build/symbols
+	@$(FLUTTER) build apk --release --no-obfuscate --target-platform android-arm64 --dart-define-from-file=env.json
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo ""
+	@echo "✅ RELEASE NO-OBFUSCATE built - test if obfuscate penyebab WebView 500"
+	@echo "   Publisher: CN=Nihtip.com - Verif: apksigner verify --print-certs ..."
 
 size:
 	@echo "📊 Analyzing APK size breakdown..."

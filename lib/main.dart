@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/responsive.dart';
+import 'core/services/crash_service.dart';
 
 import 'presentation/pages/welcome/welcome_page.dart';
 import 'presentation/pages/auth/login_page.dart';
@@ -260,7 +261,15 @@ void main() async {
 
   try {
     await Firebase.initializeApp();
-    
+
+    // Init Crashlytics & Analytics (best practice: no extra bloat)
+    try {
+      await CrashService.init();
+      debugPrint('[CRASH] Crashlytics initialized');
+    } catch (e) {
+      debugPrint('[CRASH] init failed: $e');
+    }
+
     // Initialize local notifications for foreground display
     await _initLocalNotifications();
 

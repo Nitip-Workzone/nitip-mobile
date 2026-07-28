@@ -1,9 +1,21 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+}
+
+// Load keystore properties outside android block to avoid Kotlin DSL scoping issue
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use { fis: FileInputStream ->
+        keystoreProperties.load(fis)
+    }
 }
 
 android {
@@ -17,26 +29,47 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
+    // Use compilerOptions instead of kotlinOptions (Kotlin DSL compatible)
+    // kotlinOptions { jvmTarget = ... } deprecated
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.codecoffy.nitip_flutter_mobile"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProperties.getProperty("storeFile")
+                ?: System.getenv("KEYSTORE_FILE")
+            val storePassword = keystoreProperties.getProperty("storePassword")
+                ?: System.getenv("KEYSTORE_PASSWORD")
+            val keyAlias = keystoreProperties.getProperty("keyAlias")
+                ?: System.getenv("KEY_ALIAS")
+            val keyPassword = keystoreProperties.getProperty("keyPassword")
+                ?: System.getenv("KEY_PASSWORD")
+
+            if (storeFilePath != null && storePassword != null && keyAlias != null && keyPassword != null) {
+                storeFile = file(storeFilePath)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Pakai release signing jika key.properties ada, fallback debug supaya flutter run --release tetap jalan
+            val keystorePropertiesFile = rootProject.file("key.properties")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fallback debug untuk lokal dev, jangan dipakai kirim ke user
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false
