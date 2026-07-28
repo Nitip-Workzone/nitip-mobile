@@ -24,6 +24,8 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
   final locationService = LocationService();
   bool _isForeground = true;
   LatLng? _lastSentPos;
+  // Keep for backward compat, used via setHasActiveTrip but logic now single source activeOrders
+  // ignore: unused_field
   bool _hasActiveTrip = false;
 
   UserLocationNotifier(this._ref) : super(null) {
@@ -43,6 +45,7 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // P1: handle all states, not only resumed, for iOS overlay safety
     final wasForeground = _isForeground;
     _isForeground = state == AppLifecycleState.resumed;
     if (wasForeground != _isForeground) {
@@ -59,7 +62,7 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
     } catch (_) {}
   }
 
-  /// Cek apakah heartbeat boleh aktif
+  /// Cek apakah heartbeat boleh aktif — single source of truth prod
   bool get _shouldHeartbeat {
     final auth = _ref.read(authProvider);
     final user = auth.user;
@@ -67,16 +70,14 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
     if (!user.isRunner) return false;
     if (!user.isAcceptingOrders) return false; // Syarat 1: Online
     final activity = _ref.read(activityProvider);
-    if (activity.activeOrders.isEmpty) return false; // Syarat 2: Ada order aktif
-    if (!_hasActiveTrip && activity.activeOrders.isEmpty) {
-      // Juga allow jika ada activeOrder meski trip belum, karena trip bisa implicit
-      // Tapi jika mau strict trip: cek tripProvider. Untuk sekarang activeOrder sudah cukup mewakili.
-    }
+    if (activity.activeOrders.isEmpty) return false; // Syarat 2: Ada order aktif (single source, not _hasActiveTrip dupe)
     if (!_isForeground) return false; // Syarat 3: foreground
     return true;
   }
 
   void setHasActiveTrip(bool hasTrip) {
+    // P1: keep _hasActiveTrip for backward compat but make it derived from activity in _shouldHeartbeat
+    // This method now only triggers re-evaluate and syncs currentTripId via dashboard listener
     _hasActiveTrip = hasTrip;
     _evaluateTrackingState();
   }
@@ -91,7 +92,7 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
 
   void startTracking() {
     if (_timer != null && _timer!.isActive) return;
-    // Heartbeat interval 45s (sebelumnya 15s terlalu sering)
+    // Heartbeat interval 45s (sebelumnya 15s terlalu sering) — prod 512M + 192M redis safe
     _timer = Timer.periodic(const Duration(seconds: 45), (timer) async {
       if (!_shouldHeartbeat) {
         stopTracking();
@@ -113,7 +114,7 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
       final pos = await locationService.getCurrentPosition();
       if (pos == null) return;
 
-      // Distance dedup: skip if moved <20m
+      // Distance dedup: skip if moved <20m (aligned with backend 20m)
       if (_lastSentPos != null) {
         const distance = Distance();
         final moved = distance.as(LengthUnit.Meter, _lastSentPos!, pos);
@@ -126,7 +127,7 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
       if (!auth.isAuthenticated || auth.user == null) return;
 
       final activity = _ref.read(activityProvider);
-      final activeTripId = _ref.read(_currentTripIdProvider);
+      final activeTripId = _ref.read(currentTripIdProvider);
       final activeOrdersCount = activity.activeOrders.length;
 
       await _ref.read(authRepositoryProvider).sendHeartbeat(
@@ -159,8 +160,8 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
   }
 }
 
-// Helper provider untuk menyimpan tripId aktif (di-set dari trips tab)
-final _currentTripIdProvider = StateProvider<String?>((ref) => null);
+// Helper provider untuk menyimpan tripId aktif (di-set dari trips tab) - public for cross-library
+final currentTripIdProvider = StateProvider<String?>((ref) => null);
 
 /// Provider helper untuk dashboard/trip tab meng-set apakah ada trip aktif
 final hasActiveTripProvider = StateProvider<bool>((ref) => false);

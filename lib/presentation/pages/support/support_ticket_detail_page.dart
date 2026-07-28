@@ -76,9 +76,9 @@ class _SupportTicketDetailPageState extends ConsumerState<SupportTicketDetailPag
                 final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Tutup Tiket'), content: const Text('Yakin tutup tiket ini?'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Tutup'))]));
                 if (confirm == true) {
                   await ref.read(supportProvider.notifier).closeTicket(widget.ticketId);
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket ditutup')));
-                    Navigator.pop(context);
+                    if (context.mounted) Navigator.pop(context);
                   }
                 }
               },

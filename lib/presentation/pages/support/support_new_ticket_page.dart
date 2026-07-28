@@ -96,7 +96,7 @@ class _SupportNewTicketPageState extends ConsumerState<SupportNewTicketPage> {
             const Text('Kategori', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: category,
+              initialValue: category,
               decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
               items: categories.map((c) => DropdownMenuItem<String>(value: c['value']!, child: Text(c['label']!, style: const TextStyle(fontSize: 13)))).toList(),
               onChanged: (v) => setState(() => category = v ?? 'other'),

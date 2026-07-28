@@ -45,11 +45,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     if (path == null || path.isEmpty) return null;
     final trimmed = path.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    // If path already contains avatars/ or uploads/, use as is with base URL
     try {
       final baseUri = Uri.parse(AppConfig.baseUrl);
-      final hostUrl = "${baseUri.scheme}://${baseUri.host}:${baseUri.port}";
-      // Handle if path already starts with / or uploads/
+      final hostUrl = baseUri.origin;
       if (trimmed.startsWith('/') || trimmed.startsWith('avatars/') || trimmed.startsWith('uploads/')) {
         final clean = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
         return "$hostUrl/$clean";
@@ -70,7 +68,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final isRunner = user?.isRunner ?? false;
     final isVerified = user?.isVerified ?? false;
     final primary = AppColors.secondary;
     final primaryDark = AppColors.secondaryDark;
@@ -632,7 +629,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                                 );
                               }
                             } catch (e) {
-                              if (mounted) {
+                              if (context.mounted) {
                                 sheetSetState(() => isSaving = false);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(

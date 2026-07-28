@@ -143,6 +143,10 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     final amount = _amount;
     if (amount == null || _selectedChannel == null) return;
 
+    final bankAccount = ref.read(userBankAccountProvider).value;
+    final accountNo = bankAccount?.accountNo ?? _accountController.text;
+    final accountName = bankAccount?.accountName ?? _inquiryName;
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -156,8 +160,8 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
             metadata: {
               'type': _selectedChannel!.type,
               'code': _selectedChannel!.code,
-              'account_no': _accountController.text,
-              'account_name': _inquiryName,
+              'account_no': accountNo,
+              'account_name': accountName,
             },
           );
       if (mounted) {

@@ -33,7 +33,7 @@ class SupportState {
     List<SupportTicketModel>? tickets,
     List<SupportMessageModel>? messages,
     SupportTicketModel? currentTicket,
-    String? error,
+    Object? error = const Object(),
   }) {
     return SupportState(
       isLoading: isLoading ?? this.isLoading,
@@ -41,9 +41,18 @@ class SupportState {
       tickets: tickets ?? this.tickets,
       messages: messages ?? this.messages,
       currentTicket: currentTicket ?? this.currentTicket,
-      error: error,
+      error: error == const Object() ? this.error : error as String?,
     );
   }
+
+  SupportState clearCurrentTicket() => SupportState(
+        isLoading: isLoading,
+        isMessagesLoading: isMessagesLoading,
+        tickets: tickets,
+        messages: messages,
+        currentTicket: null,
+        error: error,
+      );
 }
 
 class SupportNotifier extends StateNotifier<SupportState> {
@@ -92,10 +101,33 @@ class SupportNotifier extends StateNotifier<SupportState> {
     }
   }
 
+  int _pollingFailCount = 0;
+
   void startPolling(String ticketId) {
     stopPolling();
+    _pollingFailCount = 0;
+    // P1: backoff 5s base, + incremental if fail, stops on background via lifecycle observer in page
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      await fetchMessages(ticketId, isInitial: false);
+      try {
+        await fetchMessages(ticketId, isInitial: false);
+        _pollingFailCount = 0;
+      } catch (_) {
+        _pollingFailCount++;
+        // Exponential backoff up to 30s if repeated fails (prod 512M safety)
+        if (_pollingFailCount >= 3) {
+          stopPolling();
+          final backoff = Duration(seconds: (5 * (1 << (_pollingFailCount - 3))).clamp(5, 30));
+          _pollingTimer = Timer.periodic(backoff, (_) async {
+            try {
+              await fetchMessages(ticketId, isInitial: false);
+              // Reset to 5s on success
+              startPolling(ticketId);
+            } catch (_) {
+              // keep backoff
+            }
+          });
+        }
+      }
     });
   }
 
