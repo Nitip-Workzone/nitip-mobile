@@ -34,9 +34,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     super.initState();
     Future.microtask(() {
       if (!mounted) return;
-      ref.read(userLocationProvider.notifier).updateLocation();
-      ref.read(activityProvider.notifier).fetchActivities();
-      ref.read(tripProvider.notifier).fetchMyTrips();
+      final user = ref.read(authProvider).user;
+      final isMerchant = user?.isMerchant ?? false;
+      // Merchant uses MerchantDashboardPage directly, don't fetch requester/runner data
+      if (!isMerchant) {
+        ref.read(userLocationProvider.notifier).updateLocation();
+        ref.read(activityProvider.notifier).fetchActivities();
+        ref.read(tripProvider.notifier).fetchMyTrips();
+      }
     });
   }
 
@@ -45,10 +50,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     // Listen for auth state changes to trigger fetches when becoming authenticated
     ref.listen(authProvider, (previous, next) {
       if (next.isAuthenticated && (previous == null || !previous.isAuthenticated)) {
-        ref.read(walletProvider.notifier).fetchBalance();
-        ref.read(notificationProvider.notifier).fetchUnreadCount();
-        ref.read(activityProvider.notifier).fetchActivities();
-        ref.read(tripProvider.notifier).fetchMyTrips();
+        final isMerchant = next.user?.isMerchant ?? false;
+        if (!isMerchant) {
+          ref.read(walletProvider.notifier).fetchBalance();
+          ref.read(notificationProvider.notifier).fetchUnreadCount();
+          ref.read(activityProvider.notifier).fetchActivities();
+          ref.read(tripProvider.notifier).fetchMyTrips();
+        }
       }
     });
 

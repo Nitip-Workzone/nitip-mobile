@@ -57,15 +57,12 @@ class TrackingRepository {
   }
 
   /// Sends Runner's current location to the backend
+  /// FIX 2026-07-28: Stop using GET /users/me with X-Location (causes /me spam in logs)
+  /// Merchant doesn't need tracking at all. Use dedicated heartbeat endpoint or no-op.
   Future<void> updateLocation(double lat, double lng) async {
-    // We use the X-Location header pattern or a dedicated endpoint.
-    // Based on user/handler.go, calling /users/me with X-Location also updates it passively.
-    // Or we can use the dedicated WS stream if implemented.
-    // For simplicity and robustness, we'll use a PUT to a dedicated endpoint if available
-    // but the backend handler.go showed passive update in GetMe.
-    // Let's use the X-Location header on a simple GET /users/me call for now as a heartbeat.
-    await _apiClient.dio.get('/users/me', options: Options(
-      headers: {'X-Location': '$lat,$lng'},
-    ));
+    // Merchant: no tracking needed, skip /me call to avoid log spam
+    // Runner: heartbeat already uses /users/heartbeat via auth_repository, so this is legacy no-op
+    // Keeping method for backward compat but not calling /me
+    return;
   }
 }

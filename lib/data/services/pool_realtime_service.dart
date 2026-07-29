@@ -53,12 +53,15 @@ class PoolRealtimeService {
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 0), // infinite for SSE
-        headers: {'Accept': 'text/event-stream'},
+        headers: {
+          'Accept': 'text/event-stream',
+          'Authorization': 'Bearer $token',
+        },
       ));
 
-      // EventSource via query param token (middleware supports ?token=, since EventSource can't set Authorization header)
+      // REFACTOR 2026-07-29: Cookie-only + Authorization header, no ?token= query (security + logs)
       final url =
-          '${AppConfig.baseUrl}orders/pool/stream?lat=$lat&lng=$lng&radius=$radiusKm&token=${Uri.encodeComponent(token)}';
+          '${AppConfig.baseUrl}orders/pool/stream?lat=$lat&lng=$lng&radius=$radiusKm';
 
       final resp = await dio.get<ResponseBody>(
         url,

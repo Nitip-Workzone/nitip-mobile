@@ -13,13 +13,22 @@ LOCAL_IP = $(shell hostname -I | awk '{print $$1}')
 
 help:
 	@echo "Available commands:"
-	@echo "  make emu       - Launch Android Emulator (Interactive Selector)"
-	@echo "  make kill-emu  - Close all running emulators"
+	@echo "  make emu          - Launch Android Emulator (Interactive Selector)"
+	@echo "  make kill-emu     - Close all running emulators"
 	@echo "  make kill-emu-force - Force kill emulators and clean lock files"
-	@echo "  make devices   - List all connected devices"
-	@echo "  make run       - Run the app (prompts if multi-device)"
-	@echo "  make run-hp    - Run specifically on real device (4ZFBB26206206936)"
-	@echo "  make run-ext   - Interactive device selector (fzf)"
+	@echo "  make devices      - List all connected devices"
+	@echo ""
+	@echo "  Debug Runs (PROD API - api.nihtip.com - for WebView 500 debug on real HP):"
+	@echo "  make run          - Run with env.json prod (auto prod) - fixes Connection refused"
+	@echo "  make run-hp       - Run on real device PROD (was LOCAL before, now PROD - fixes 500 debug)"
+	@echo "  make run-hp-prod  - Run on real device PROD explicitly"
+	@echo "  make run-ext      - Interactive selector: emu=LOCAL, hp=PROD (smart)"
+	@echo ""
+	@echo "  Debug Runs (LOCAL API - requires nitip-core running on :8000):"
+	@echo "  make run-hp-local - Real device LOCAL (http://LOCAL_IP:8000)"
+	@echo "  make run-ext-local - Interactive LOCAL mode"
+	@echo ""
+	@echo "  Other:"
 	@echo "  make clean     - Clean build artifacts (no-update)"
 	@echo "  make update    - Update Flutter SDK and dependencies"
 	@echo "  make quiet-logs - Silence noisy EGL emulation logs (Android)"
@@ -69,13 +78,26 @@ devices:
 	@$(FLUTTER) devices
 
 run:
-	@echo "Running Nitip Mobile..."
+	@echo "Running Nitip Mobile (auto prod from env.json)..."
+	@echo "  BASE_URL from env.json: $$(jq -r '.BASE_URL' env.json 2>/dev/null || echo 'not found, using default prod')"
 	@$(FLUTTER) run --no-enable-impeller --dart-define-from-file=env.json | grep -v "app_time_stats"
 
+# Real device prod - FIX for WebView 500 debug: use prod api.nihtip.com, not local IP (local IP causes Connection refused when core not running)
 run-hp:
-	@echo "Running specifically on Real Device..."
-	@$(FLUTTER) run --no-enable-impeller -d 4ZFBB26206206936 --dart-define-from-file=env.json --dart-define=BASE_URL=http://$(LOCAL_IP):8000/api/v1/
+	@echo "Running on Real Device (PROD - api.nihtip.com) - for WebView 500 debug..."
+	@echo "  ENV: $$(jq -r '.ENV' env.json 2>/dev/null), BASE_URL: $$(jq -r '.BASE_URL' env.json 2>/dev/null)"
+	@$(FLUTTER) run --no-enable-impeller -d 4ZFBB26206206936 --dart-define-from-file=env.json
 
+# Real device prod alias (explicit)
+run-hp-prod:
+	@echo "Running on Real Device (PROD explicitly - api.nihtip.com)..."
+	@$(FLUTTER) run --no-enable-impeller -d 4ZFBB26206206936 --dart-define-from-file=env.json
+
+# Real device local - only when nitip-core is running locally on :8000
+run-hp-local:
+	@echo "Running on Real Device (LOCAL - http://$(LOCAL_IP):8000/api/v1/ - requires nitip-core running)..."
+	@echo "  Make sure cd ../nitip-core && make run or docker compose up"
+	@$(FLUTTER) run --no-enable-impeller -d 4ZFBB26206206936 --dart-define-from-file=env.json --dart-define=BASE_URL=http://$(LOCAL_IP):8000/api/v1/
 
 run-ext:
 	@echo "Selecting device..."
@@ -88,13 +110,35 @@ run-ext:
 	if [ -n "$$DEVICE_ID" ]; then \
 		if [ "$$IS_EMU" = "true" ]; then \
 			URL="http://10.0.2.2:8000/api/v1/"; \
-			echo "📱 Running on Emulator ($$DEVICE_ID)"; \
+			echo "📱 Running on Emulator ($$DEVICE_ID) - LOCAL (requires nitip-core running)"; \
 			echo "🔗 API URL: $$URL"; \
+			echo "💡 For prod WebView 500 debug on emulator, use: make run-hp-prod or flutter run --dart-define-from-file=env.json -d $$DEVICE_ID"; \
+			$(FLUTTER) run --no-enable-impeller -d $$DEVICE_ID --dart-define-from-file=env.json --dart-define=BASE_URL=$$URL; \
+		else \
+			echo "📲 Running on Real Device ($$DEVICE_ID) - PROD (api.nihtip.com) - for WebView 500 debug"; \
+			echo "🔗 API URL: from env.json (prod) - no LOCAL_IP override"; \
+			echo "💡 For LOCAL testing: make run-hp-local"; \
+			$(FLUTTER) run --no-enable-impeller -d $$DEVICE_ID --dart-define-from-file=env.json; \
+		fi; \
+	else \
+		echo "No device selected."; \
+	fi
+
+run-ext-local:
+	@echo "Selecting device (LOCAL mode - 10.0.2.2:8000 for emu, LOCAL_IP:8000 for hp)..."
+	@$(FLUTTER) devices --machine | jq -r '.[] | "\(.name) | \(.id) | \(.emulator) | \(.targetPlatform)"' > .devices.tmp
+	@fzf --header="Pilih Perangkat Nitip LOCAL (Arrow Keys + Enter)" --height=15% --layout=reverse --border < .devices.tmp > .selected_device 2> /dev/tty || true
+	@SELECTED=$$(cat .selected_device 2>/dev/null); \
+	DEVICE_ID=$$(echo "$$SELECTED" | cut -d'|' -f2 | xargs); \
+	IS_EMU=$$(echo "$$SELECTED" | cut -d'|' -f3 | xargs); \
+	rm -f .devices.tmp .selected_device; \
+	if [ -n "$$DEVICE_ID" ]; then \
+		if [ "$$IS_EMU" = "true" ]; then \
+			URL="http://10.0.2.2:8000/api/v1/"; \
 		else \
 			URL="http://$(LOCAL_IP):8000/api/v1/"; \
-			echo "📲 Running on Real Device ($$DEVICE_ID)"; \
-			echo "🔗 API URL: $$URL (Local IP: $(LOCAL_IP))"; \
 		fi; \
+		echo "🔗 LOCAL API URL: $$URL (requires nitip-core running)"; \
 		$(FLUTTER) run --no-enable-impeller -d $$DEVICE_ID --dart-define-from-file=env.json --dart-define=BASE_URL=$$URL; \
 	else \
 		echo "No device selected."; \
@@ -253,6 +297,21 @@ build-apk-release-noobfs:
 	@echo ""
 	@echo "✅ RELEASE NO-OBFUSCATE built - test if obfuscate penyebab WebView 500"
 	@echo "   Publisher: CN=Nihtip.com - Verif: apksigner verify --print-certs ..."
+
+# Prod debug - RELEASE no-obfuscate + ada diagnostics panel ringan (bug icon) untuk debug 500 prod
+build-apk-prod-debug:
+	@echo "🔍 Building APK PROD-DEBUG (release no-obfs + diagnostics panel ringan)..."
+	@echo "   BASE_URL : $$(jq -r '.BASE_URL' env.json)"
+	@echo "   ENV      : $$(jq -r '.ENV' env.json)"
+	@echo "   Flags    : --release --no-obfuscate --arm64 + diagnostics (30 logs, no payload)"
+	@echo ""
+	@rm -rf build/app/outputs/flutter-apk/ 2>/dev/null || true
+	@mkdir -p build/symbols
+	@$(FLUTTER) build apk --release --no-obfuscate --target-platform android-arm64 --dart-define-from-file=env.json
+	@ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
+	@echo ""
+	@echo "✅ PROD-DEBUG built - ada bug icon di AppBar untuk lihat diagnostics (cookie, ls, api/me, logs)"
+	@echo "   Install: adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
 
 size:
 	@echo "📊 Analyzing APK size breakdown..."

@@ -18,6 +18,7 @@ import '../../providers/activity_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/explore_orders_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/order_status_provider.dart';
 import 'qr_scanner_page.dart';
 
 
@@ -33,6 +34,8 @@ class OrderDetailPage extends ConsumerStatefulWidget {
 
 class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   bool _isProcessing = false;
+  bool _localCompleted = false; // low-burden guard to prevent revert to ready after complete
+  bool _hasShownReadySnack = false;
   WebViewController? _mapWebViewController;
   WebViewController? _previewMapWebViewController;
   bool _isMapLoading = true;
@@ -40,6 +43,63 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   bool _isPreviewMapLoading = true;
   bool _hasPreviewMapError = false;
   String? _lastMapStatus; // Track status to detect changes
+  String? _lastNotifiedStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    // Trigger order status realtime provider early (autoDispose family)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        // ignore return, provider will start connect
+        ref.read(orderStatusProvider(widget.orderId));
+      }
+    });
+  }
+
+  OrderModel _resolveOrder(
+      ActivityState activityState,
+      ExploreOrdersState exploreState,
+      OrderStatusState? realtimeState,
+      ) {
+    OrderModel base = activityState.activeOrders.firstWhere(
+          (o) => o.id == widget.orderId,
+      orElse: () => activityState.pastOrders.firstWhere(
+            (o) => o.id == widget.orderId,
+        orElse: () => exploreState.availableOrders.firstWhere(
+              (o) => o.id == widget.orderId,
+          orElse: () => OrderModel.empty(),
+        ),
+      ),
+    );
+
+    // Local completed guard – highest priority after actual completed status
+    if (_localCompleted && base.id.isNotEmpty) {
+      if (base.status != 'completed') {
+        return base.copyWith(status: 'completed');
+      }
+      return base;
+    }
+
+    // Realtime status overrides cache if newer and not stale
+    if (realtimeState != null && realtimeState.status.isNotEmpty && base.id.isNotEmpty) {
+      final rtStatus = realtimeState.status.toLowerCase();
+      // If base already completed, keep completed (lock)
+      if (base.status == 'completed') return base;
+      // If realtime says completed, respect it
+      if (rtStatus == 'completed') {
+        if (base.status != rtStatus) {
+          return base.copyWith(status: rtStatus);
+        }
+      } else if (base.status != rtStatus) {
+        // Only override if not locked completed
+        // Simple heuristic: realtime newer than base
+        return base.copyWith(status: rtStatus);
+      }
+    }
+
+    return base;
+  }
 
   void _initPreviewMapWebView(OrderModel order) {
     final url = Uri.parse('${AppConfig.webBaseUrl}/map/route').replace(queryParameters: {
@@ -600,20 +660,30 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   Widget build(BuildContext context) {
     final activityState = ref.watch(activityProvider);
     final exploreState = ref.watch(exploreOrdersProvider);
+    final realtimeState = ref.watch(orderStatusProvider(widget.orderId));
     final user = ref.watch(authProvider).user;
     final isRunner = user?.isRunner ?? false;
     final primary = isRunner ? AppColors.secondary : AppColors.primary;
 
-    final order = activityState.activeOrders.firstWhere(
-      (o) => o.id == widget.orderId,
-      orElse: () => exploreState.availableOrders.firstWhere(
-        (o) => o.id == widget.orderId,
-        orElse: () => activityState.pastOrders.firstWhere(
-          (o) => o.id == widget.orderId,
-          orElse: () => OrderModel.empty(),
-        ),
-      ),
-    );
+    final order = _resolveOrder(activityState, exploreState, realtimeState);
+
+    // Side effect: notify when cooking -> ready (low burden, once)
+    if (isRunner && order.id.isNotEmpty && order.status == 'ready' && _lastNotifiedStatus != 'ready') {
+      _lastNotifiedStatus = 'ready';
+      if (!_hasShownReadySnack) {
+        _hasShownReadySnack = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showSnackBar('Makanan siap diambil! Silakan menuju merchant.');
+            // Haptic light
+            HapticFeedback.mediumImpact();
+          }
+        });
+      }
+    }
+    if (order.status != 'ready') {
+      _lastNotifiedStatus = order.status;
+    }
 
     if (order.id.isEmpty) {
       // Jika salah satu provider sedang mengambil data atau belum pernah mengambil data,
@@ -683,6 +753,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     }
 
     final bool isActiveRunnerTask = isRunner && order.status != 'pending';
+    final isCompleted = order.status == 'completed' || _localCompleted;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -711,7 +782,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
               ]);
             },
             color: primary,
-            child: isActiveRunnerTask
+            child: (isActiveRunnerTask || isCompleted)
                 ? _buildActiveRunnerTaskLayout(order, primary)
                 : _buildPreviewLayout(order, primary, isRunner),
           ),
@@ -719,7 +790,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
             bottom: 0,
             left: 0,
             right: 0,
-            child: _buildBottomActionBar(order, primary, isRunner),
+            child: _buildBottomActionBar(order, primary, isRunner, isCompletedOverride: isCompleted),
           ),
         ],
       ),
@@ -1926,12 +1997,59 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     );
   }
 
-  Widget _buildBottomActionBar(OrderModel order, Color primary, bool isRunner) {
+  Widget _buildBottomActionBar(OrderModel order, Color primary, bool isRunner, {bool isCompletedOverride = false}) {
+    final bool isCompletedEffective = isCompletedOverride || order.status == 'completed' || _localCompleted;
     if (_isProcessing) {
       return Container(
         color: Colors.white,
         padding: const EdgeInsets.all(24),
         child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (isCompletedEffective) {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Pesanan selesai. Pendapatan telah masuk dompet.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMain)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/support/new?order_id=${order.id}'),
+                icon: const Icon(Icons.support_agent_rounded, size: 18),
+                label: const Text('Butuh Bantuan? Buat Tiket CS', style: TextStyle(fontSize: 13)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.grey.shade700,
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -2752,6 +2870,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                           final success = await ref.read(activityProvider.notifier).completeOrder(orderId, code, localPath);
 
                           if (success) {
+                            if (mounted) {
+                              setState(() => _localCompleted = true);
+                            }
                             if (context.mounted) {
                               Navigator.pop(context); // Close the dialog
                             }

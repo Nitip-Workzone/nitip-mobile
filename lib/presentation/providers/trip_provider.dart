@@ -42,19 +42,24 @@ class TripState {
 
 class TripNotifier extends StateNotifier<TripState> {
   final TripRepository _tripRepo;
+  final Ref _ref;
 
-  TripNotifier(this._tripRepo) : super(TripState());
+  TripNotifier(this._tripRepo, this._ref) : super(TripState());
 
   Future<void> fetchMyTrips({bool force = false}) async {
     if (state.hasFetched && !force && !state.isLoading) return;
+    // Merchant doesn't need trips - skip to avoid 403 or empty spam
+    try {
+      final auth = _ref.read(authProvider);
+      if (auth.user?.isMerchant ?? false) {
+        state = state.copyWith(isLoading: false, hasFetched: true, myTrips: []);
+        return;
+      }
+    } catch (_) {}
     state = state.copyWith(isLoading: true, error: null);
     try {
       final trips = await _tripRepo.getMyTrips();
-      state = state.copyWith(
-        isLoading: false,
-        hasFetched: true,
-        myTrips: trips,
-      );
+      state = state.copyWith(isLoading: false, hasFetched: true, myTrips: trips);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -132,7 +137,7 @@ class TripNotifier extends StateNotifier<TripState> {
 
 final tripProvider = StateNotifierProvider<TripNotifier, TripState>((ref) {
   final repo = ref.watch(tripRepositoryProvider);
-  final notifier = TripNotifier(repo);
+  final notifier = TripNotifier(repo, ref);
   // Auto-fetch on initialization
   notifier.fetchMyTrips();
   return notifier;

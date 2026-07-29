@@ -66,6 +66,10 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   final Ref _ref;
   static const int _limit = 15;
 
+  // Low-burden lock: once order marked completed via optimistic, never revert to earlier status from stale fetch
+  final Set<String> _completedLock = {};
+  final Set<String> _deliveringLock = {};
+
   ActivityNotifier(this._orderRepo, this._ref) : super(ActivityState());
 
   Future<void>? _fetchFuture;
@@ -73,11 +77,54 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   void reset() {
     state = ActivityState();
     _fetchFuture = null;
+    _completedLock.clear();
+    _deliveringLock.clear();
+  }
+
+  // Patch single order status without full fetch – used by realtime provider (low burden)
+  void patchOrderStatus(String id, String newStatus) {
+    final lower = newStatus.toLowerCase().trim();
+    if (lower.isEmpty) return;
+    // Respect completed lock
+    if (_completedLock.contains(id) && lower != 'completed') {
+      return; // ignore stale revert to ready/delivering
+    }
+    if (lower == 'completed') _completedLock.add(id);
+    if (lower == 'delivering') _deliveringLock.add(id);
+
+    final current = state._allOrders;
+    final idx = current.indexWhere((o) => o.id == id);
+    if (idx == -1) return; // not in current list, ignore patch (full fetch will add later if needed)
+    final updated = current[idx].copyWith(status: lower);
+    final newList = List<OrderModel>.from(current);
+    newList[idx] = updated;
+    state = state.copyWith(allOrders: newList);
+  }
+
+  void patchOrder(OrderModel fullOrder) {
+    final id = fullOrder.id;
+    if (_completedLock.contains(id) && fullOrder.status != 'completed') {
+      // keep completed, ignore stale
+      return;
+    }
+    if (fullOrder.status == 'completed') _completedLock.add(id);
+    final current = state._allOrders;
+    final idx = current.indexWhere((o) => o.id == id);
+    if (idx == -1) {
+      // insert if not exist (e.g. fallback fetch found order)
+      state = state.copyWith(allOrders: [fullOrder, ...current]);
+    } else {
+      final newList = List<OrderModel>.from(current);
+      newList[idx] = fullOrder;
+      state = state.copyWith(allOrders: newList);
+    }
   }
 
   Future<void> fetchActivities({bool force = false}) async {
     final authState = _ref.read(authProvider);
     if (!authState.isAuthenticated || authState.user == null) return;
+    // Merchant doesn't use /orders/me - use merchant orders via WebView, skip to avoid 403/200 empty spam
+    if (authState.user?.isMerchant ?? false) return;
 
     // 1. Skip if already fetched and not forced
     if (state.hasFetched && !force) return;
@@ -98,16 +145,32 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
 
     try {
       final orders = await _orderRepo.getMyOrders(page: 1, limit: _limit);
+      final merged = _applyCompletedLock(orders);
       state = state.copyWith(
         isLoading: false,
         hasFetched: true,
         currentPage: 1,
         hasMore: orders.length == _limit,
-        allOrders: orders,
+        allOrders: merged,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, hasFetched: true, error: e.toString());
     }
+  }
+
+  List<OrderModel> _applyCompletedLock(List<OrderModel> incoming) {
+    if (_completedLock.isEmpty) return incoming;
+    // Preserve completed status for locked ids even if server returns stale
+    final existingMap = {for (var o in state._allOrders) o.id: o};
+    return incoming.map((o) {
+      if (_completedLock.contains(o.id) && o.status != 'completed') {
+        final kept = existingMap[o.id];
+        if (kept != null && kept.status == 'completed') return kept;
+        return o.copyWith(status: 'completed');
+      }
+      if (o.status == 'completed') _completedLock.add(o.id);
+      return o;
+    }).toList();
   }
 
   Future<void> loadMore() async {
@@ -117,7 +180,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
     try {
       final nextPage = state.currentPage + 1;
       final orders = await _orderRepo.getMyOrders(page: nextPage, limit: _limit);
-      final merged = [...state._allOrders, ...orders];
+      final merged = [...state._allOrders, ..._applyCompletedLock(orders)];
       state = state.copyWith(
         isLoadingMore: false,
         currentPage: nextPage,
@@ -178,7 +241,8 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   }
 
   Future<bool> pickupOrder(String id) async {
-    // Optimistic Update
+    // Optimistic Update + lock delivering
+    _deliveringLock.add(id);
     final originalOrders = state._allOrders;
     state = state.copyWith(
       allOrders: state._allOrders.map((o) => o.id == id ? o.copyWith(status: 'delivering') : o).toList(),
@@ -189,6 +253,7 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
       await fetchActivities(force: true);
       return true;
     } catch (e) {
+      _deliveringLock.remove(id);
       // Revert if failed
       state = state.copyWith(allOrders: originalOrders);
       return false;
@@ -196,7 +261,8 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
   }
 
   Future<bool> completeOrder(String id, String code, String imagePath) async {
-    // Optimistic Update
+    // Optimistic Update + hard lock completed (prevents stale revert to ready)
+    _completedLock.add(id);
     final originalOrders = state._allOrders;
     state = state.copyWith(
       allOrders: state._allOrders.map((o) => o.id == id ? o.copyWith(status: 'completed') : o).toList(),
@@ -204,11 +270,12 @@ class ActivityNotifier extends StateNotifier<ActivityState> {
 
     try {
       await _orderRepo.completeOrder(id, code, imagePath);
+      // After success, fetch but keep completed lock – _applyCompletedLock will preserve it
       await fetchActivities(force: true);
       return true;
     } catch (e) {
       debugPrint('DEBUG COMPLETE ORDER ERROR: $e');
-      // Revert if failed
+      _completedLock.remove(id); // only remove lock on failure
       state = state.copyWith(allOrders: originalOrders);
       return false;
     }

@@ -79,12 +79,23 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   Future<void> _performFetchBalance() async {
-    state = state.copyWith(isLoading: true, error: null);
+    if (_disposed) return;
+    if (mounted) state = state.copyWith(isLoading: true, error: null);
     try {
       final wallet = await _repository.getBalance();
+      if (_disposed || !mounted) return;
       state = state.copyWith(isLoading: false, wallet: wallet, hasFetched: true);
     } catch (e) {
+      if (_disposed || !mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
