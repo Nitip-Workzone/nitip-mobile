@@ -85,7 +85,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
     if (_ktpPath == null) return;
     if (_nikController.text.length < 16) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('NIK harus 16 digit')),
+        const SnackBar(content: Text('Mohon pastikan NIK KTP Anda berjumlah pas 16 digit.')),
       );
       return;
     }

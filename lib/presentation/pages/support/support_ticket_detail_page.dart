@@ -48,7 +48,7 @@ class _SupportTicketDetailPageState extends ConsumerState<SupportTicketDetailPag
       messageCtrl.clear();
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal kirim: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pesan gagal dikirim. Periksa koneksi internet Anda.')));
     } finally {
       if (mounted) setState(() => isSending = false);
     }
@@ -108,7 +108,7 @@ class _SupportTicketDetailPageState extends ConsumerState<SupportTicketDetailPag
                             Text(ticket.category, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                             if (ticket.orderId != null) ...[
                               const SizedBox(width: 8),
-                              Text('Order #${ticket.orderId!.substring(0, 8).toUpperCase()}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                              Text('Order #${ticket.orderId!.length > 8 ? ticket.orderId!.substring(0, 8) : ticket.orderId!}'.toUpperCase(), style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                             ],
                           ],
                         ),

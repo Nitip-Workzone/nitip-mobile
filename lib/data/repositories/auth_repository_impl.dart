@@ -101,7 +101,7 @@ class AuthRepositoryImpl implements AuthRepository {
       if (response.data['success'] == true) {
         return User.fromJson(response.data['data']);
       } else {
-        throw Exception(response.data['message'] ?? 'Registrasi gagal');
+        throw Exception(response.data['message'] ?? 'Proses pendaftaran gagal. Silakan coba lagi.');
       }
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';

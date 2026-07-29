@@ -163,7 +163,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   if (success && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Pesanan #${selectedOrder.id.substring(0, 8)} berhasil diselesaikan!'),
+                        content: Text('Pesanan #${selectedOrder.id.length > 8 ? selectedOrder.id.substring(0, 8) : selectedOrder.id} berhasil diselesaikan!'),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: Colors.green,
                       ),

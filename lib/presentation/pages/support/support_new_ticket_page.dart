@@ -35,11 +35,11 @@ class _SupportNewTicketPageState extends ConsumerState<SupportNewTicketPage> {
 
   Future<void> _submit() async {
     if (titleCtrl.text.trim().length < 5) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Judul minimal 5 karakter')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mohon pastikan judul tiket Anda terdiri dari minimal 5 karakter.')));
       return;
     }
     if (descCtrl.text.trim().length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Deskripsi minimal 10 karakter')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mohon ceritakan kendala Anda minimal 10 karakter ya.')));
       return;
     }
     setState(() => isSubmitting = true);
@@ -51,12 +51,12 @@ class _SupportNewTicketPageState extends ConsumerState<SupportNewTicketPage> {
         if (widget.orderId != null) 'order_id': widget.orderId,
       });
       if (ticket != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket berhasil dibuat! Menunggu CS'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket berhasil dibuat! Menunggu CS'), backgroundColor: AppColors.success));
         context.go('/support/${ticket.id}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuat tiket: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maaf, tiket gagal dibuat saat ini. Silakan coba sebentar lagi.'), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) setState(() => isSubmitting = false);
@@ -88,7 +88,7 @@ class _SupportNewTicketPageState extends ConsumerState<SupportNewTicketPage> {
                   children: [
                     Icon(Icons.receipt_long_rounded, size: 18, color: primary),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('Terkait Order: ${widget.orderId!.substring(0, 8).toUpperCase()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                    Expanded(child: Text('Terkait Order: ${widget.orderId!.length > 8 ? widget.orderId!.substring(0, 8).toUpperCase() : widget.orderId!.toUpperCase()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),

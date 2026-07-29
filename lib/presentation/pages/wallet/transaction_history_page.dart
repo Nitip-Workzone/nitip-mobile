@@ -265,12 +265,42 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
                   ? _TransactionSkeleton()
                   : filtered.isEmpty
                       ? _EmptyState(primary: primary)
-                      : ListView(
-                          controller: _scrollCtrl,
-                          padding: const EdgeInsets.only(bottom: 32),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            ...grouped.entries.map((entry) {
+                      : () {
+                          final groupEntries = grouped.entries.toList();
+                          return ListView.builder(
+                            controller: _scrollCtrl,
+                            padding: const EdgeInsets.only(bottom: 32),
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: groupEntries.length + 1, // +1 for load-more indicator
+                            itemBuilder: (context, index) {
+                              if (index == groupEntries.length) {
+                                // ── Load-more indicator ───────────────────────
+                                if (walletState.isLoadingMore) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(strokeWidth: 2.5, color: primary),
+                                      ),
+                                    ),
+                                  );
+                                } else if (!walletState.hasMore && walletState.transactions.isNotEmpty && _selectedFilter == 'all') {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20),
+                                    child: Center(
+                                      child: Text(
+                                        'Semua transaksi telah ditampilkan',
+                                        style: TextStyle(fontSize: 12, color: AppColors.textMuted.withValues(alpha: 0.7)),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              }
+
+                              final entry = groupEntries[index];
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -319,37 +349,9 @@ class _TransactionHistoryPageState extends ConsumerState<TransactionHistoryPage>
                                   ),
                                 ],
                               );
-                            }),
-                            // ── Load-more indicator ───────────────────────
-                            if (walletState.isLoadingMore)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 20),
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: primary,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            else if (!walletState.hasMore && walletState.transactions.isNotEmpty && _selectedFilter == 'all')
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 20),
-                                child: Center(
-                                  child: Text(
-                                    'Semua transaksi telah ditampilkan',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textMuted.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                            },
+                          );
+                        }(),
             ),
           ),
         ],

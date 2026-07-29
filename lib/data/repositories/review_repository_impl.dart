@@ -38,7 +38,7 @@ class ReviewRepositoryImpl implements ReviewRepository {
       if (response.data['success'] == true && response.data['data'] != null) {
         return ReviewModel.fromJson(response.data['data']);
       } else {
-        throw Exception(response.data['message'] ?? 'Gagal mengirim review');
+        throw Exception(response.data['message'] ?? 'Maaf, ulasan Anda gagal tersimpan.');
       }
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';

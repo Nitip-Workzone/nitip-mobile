@@ -47,7 +47,7 @@ class WalletRepositoryImpl implements WalletRepository {
       if (response.data['success'] == true) {
         return WalletTransactionModel.fromJson(response.data['data']);
       } else {
-        throw Exception(response.data['message'] ?? 'Gagal melakukan top up');
+        throw Exception(response.data['message'] ?? 'Proses isi saldo gagal. Tenang, dana Anda tidak terpotong.');
       }
     } on DioException catch (e) {
       final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';

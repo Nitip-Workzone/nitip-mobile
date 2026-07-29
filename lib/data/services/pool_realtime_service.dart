@@ -38,7 +38,11 @@ class PoolRealtimeService {
   bool get isRunning => _running;
 
   Future<void> connect({required double lat, required double lng, double radiusKm = 15}) async {
-    if (_running) return;
+    if (_running) {
+      // If already running but with different location, allow reconnect after disconnect
+      // Keep guard to avoid duplicate connects, but reset if stale >30s is handled by provider _scheduleReconnect
+      return;
+    }
     _running = true;
     _cancelToken = CancelToken();
 
@@ -91,18 +95,17 @@ class PoolRealtimeService {
           final frame = buffer.substring(0, idx);
           buffer = buffer.substring(idx + 2);
 
-          // Parse frame: lines of event: , data: , : heartbeat
           String dataStr = '';
+          String eventName = '';
 
           for (final rawLine in frame.split('\n')) {
             final line = rawLine.trim();
             if (line.isEmpty) continue;
             if (line.startsWith(':')) {
-              // comment / heartbeat from server
               continue;
             }
             if (line.startsWith('event:')) {
-              // event type ignored, we parse from data.type instead (more reliable)
+              eventName = line.substring(6).trim();
               continue;
             } else if (line.startsWith('data:')) {
               dataStr += line.substring(5).trim();
@@ -113,13 +116,21 @@ class PoolRealtimeService {
 
           try {
             final jsonData = jsonDecode(dataStr) as Map<String, dynamic>;
-            final ev = PoolEvent.fromJson(jsonData);
+            var ev = PoolEvent.fromJson(jsonData);
+            // Fallback: use SSE event: line if type empty (e.g. connected)
+            if (ev.type.isEmpty && eventName.isNotEmpty) {
+              ev = PoolEvent(type: eventName, orderId: ev.orderId, ts: ev.ts, data: ev.data);
+            }
             if (_controller.isClosed) break;
-            // Only forward meaningful events (skip heartbeat if parsed as event)
             if (ev.type == 'heartbeat') continue;
             _controller.add(ev);
           } catch (_) {
-            // ignore parse errors
+            // If JSON parse fails but eventName is connected, still emit connected
+            if (eventName == 'connected' || eventName == 'order_created' || eventName.contains('order')) {
+              if (!_controller.isClosed) {
+                _controller.add(PoolEvent(type: eventName, orderId: null, ts: DateTime.now().millisecondsSinceEpoch, data: null));
+              }
+            }
           }
         }
       }

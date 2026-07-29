@@ -34,7 +34,7 @@ class _KycCameraPageState extends State<KycCameraPage> {
       if (!status.isGranted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Izin kamera diperlukan')),
+            const SnackBar(content: Text('Kami butuh akses kamera Anda untuk melanjutkan verifikasi.')),
           );
           Navigator.pop(context);
         }

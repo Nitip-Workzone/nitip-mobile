@@ -225,17 +225,17 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_disposed) return;
-    if (lifecycle == AppLifecycleState.paused ||
-        lifecycle == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       // Disconnect to save battery & radio
       _ref.read(orderStatusServiceProvider).disconnect();
-      state = state.copyWith(isLive: false, isConnecting: false);
-    } else if (lifecycle == AppLifecycleState.resumed) {
-      if (_shouldRun && !state.isTerminal) {
+      this.state = this.state.copyWith(isLive: false, isConnecting: false);
+    } else if (state == AppLifecycleState.resumed) {
+      if (_shouldRun && !this.state.isTerminal) {
         // Reset attempts on resume for quick reconnect
-        state = state.copyWith(reconnectAttempts: 0);
+        this.state = this.state.copyWith(reconnectAttempts: 0);
         _connectLoop();
       }
     }

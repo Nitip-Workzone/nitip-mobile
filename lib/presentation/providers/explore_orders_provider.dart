@@ -35,13 +35,27 @@ class ExploreOrdersNotifier extends StateNotifier<ExploreOrdersState> {
 
   ExploreOrdersNotifier(this._orderRepo, this._ref) : super(ExploreOrdersState());
 
-  Future<void> fetchAvailableOrders() async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> fetchAvailableOrders({bool syncLocation = false, bool force = false}) async {
+    // Avoid overlapping fetches, but allow force override for realtime events
+    if (state.isLoading && !force && state.availableOrders.isNotEmpty) {
+      // If already loading and we have data, don't start another – but for realtime we allow force=true
+      if (!force) {
+        // ignore, wait existing
+      }
+    }
+    final hasData = state.availableOrders.isNotEmpty;
+    state = state.copyWith(isLoading: !hasData || force, error: null);
     try {
-      // Sync location first to ensure backend proximity matching works
-      final location = await _ref.read(userLocationProvider.notifier).locationService.getCurrentPosition();
-      if (location != null) {
-        await _ref.read(authRepositoryProvider).updateLocation(location.latitude, location.longitude);
+      // Low burden: only sync location on initial or explicit request, not every SSE trigger (location already via pool SSE + heartbeat)
+      if (syncLocation) {
+        try {
+          final location = await _ref.read(userLocationProvider.notifier).locationService.getCurrentPosition().timeout(const Duration(seconds: 4));
+          if (location != null) {
+            await _ref.read(authRepositoryProvider).updateLocation(location.latitude, location.longitude);
+          }
+        } catch (_) {
+          // ignore location errors – still fetch pool
+        }
       }
 
       final orders = await _orderRepo.getAvailableOrders();

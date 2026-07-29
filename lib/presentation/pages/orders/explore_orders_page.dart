@@ -18,16 +18,36 @@ class ExploreOrdersPage extends ConsumerStatefulWidget {
 class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  bool _didInitPool = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
-      ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders();
+      if (!mounted) return;
+      ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: true, force: true);
       ref.read(activityProvider.notifier).fetchActivities();
-      // Start realtime pool SSE (best practice: lifecycle-aware inside provider)
-      // Will auto-disconnect when backgrounded to save battery
-      ref.read(poolRealtimeProvider.notifier);
+      if (!_didInitPool) {
+        _didInitPool = true;
+        ref.read(poolRealtimeProvider);
+      }
+      _tabController.addListener(() {
+        if (!mounted) return;
+        if (_tabController.index == 0 && !_tabController.indexIsChanging) {
+          ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false, force: true);
+        }
+      });
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Re-fetch when returning from background/detail – ensures cancelled orders removed without pull
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false, force: true);
     });
   }
 
@@ -46,116 +66,146 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
     final activeOrders = activityState.activeOrders;
     final availableOrders = state.availableOrders;
 
+    // Pool status colors & labels – distinct, not truncated
+    Color dotColor;
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+    IconData statusIcon;
+    if (poolState.isLive) {
+      dotColor = const Color(0xFF22C55E);
+      bgColor = const Color(0xFF22C55E).withValues(alpha: 0.12);
+      borderColor = const Color(0xFF22C55E).withValues(alpha: 0.3);
+      textColor = const Color(0xFF15803D);
+      statusIcon = Icons.bolt_rounded;
+    } else if (poolState.isConnecting) {
+      dotColor = const Color(0xFFF59E0B);
+      bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.15);
+      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.35);
+      textColor = const Color(0xFF9A5A00);
+      statusIcon = Icons.sync_rounded;
+    } else {
+      dotColor = const Color(0xFF64748B);
+      bgColor = const Color(0xFF64748B).withValues(alpha: 0.12);
+      borderColor = const Color(0xFF64748B).withValues(alpha: 0.25);
+      textColor = const Color(0xFF475569);
+      statusIcon = Icons.cloud_sync_rounded;
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Kelola Tugas & Order',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textMain),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: poolState.isLive ? Colors.green.withValues(alpha: 0.12) : Colors.grey.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: poolState.isLive ? Colors.green.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(
-                      color: poolState.isLive ? Colors.green : Colors.grey,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    poolState.isLive ? 'Live' : (poolState.isConnecting ? 'Conn...' : 'Poll'),
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: poolState.isLive ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (poolState.lastUpdate != null) ...[
-              const SizedBox(width: 4),
-              Text(
-                poolState.lastUpdate!,
-                style: const TextStyle(fontSize: 9, color: AppColors.textMuted),
-              ),
-            ],
-          ],
+        title: const Text(
+          'Kelola Tugas & Order',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textMain),
         ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.secondary,
-          indicatorWeight: 3,
-          labelColor: AppColors.secondary,
-          unselectedLabelColor: AppColors.textMuted,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.explore_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('Cari Orderan'),
-                  if (availableOrders.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${availableOrders.length}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
-                      ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(46),
+          child: Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.secondary,
+                indicatorWeight: 3,
+                labelColor: AppColors.secondary,
+                unselectedLabelColor: AppColors.textMuted,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.explore_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Cari Orderan'),
+                        if (availableOrders.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${availableOrders.length}',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.assignment_turned_in_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Tugas Saya'),
+                        if (activeOrders.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: const BoxDecoration(
+                              color: AppColors.success,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${activeOrders.length}',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.assignment_turned_in_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  const Text('Tugas Saya'),
-                  if (activeOrders.isNotEmpty) ...[
+              // Pool status banner – full width, distinct colors, not truncated
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  border: Border(top: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor.withValues(alpha: 0.5))),
+                ),
+                child: Row(
+                  children: [
+                    Icon(statusIcon, size: 14, color: dotColor),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
                       child: Text(
-                        '${activeOrders.length}',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        poolState.isLive
+                            ? 'Realtime Live • Update otomatis tanpa pull'
+                            : (poolState.isConnecting ? 'Menghubungkan realtime pool...' : 'Mode Polling • Tarik untuk refresh'),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textColor),
                       ),
                     ),
+                    if (poolState.isLive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: dotColor, borderRadius: BorderRadius.circular(10)),
+                        child: const Text('LIVE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white))),
+                    if (poolState.lastUpdate != null && !poolState.isConnecting) ...[
+                      const SizedBox(width: 8),
+                      Text(poolState.lastUpdate!,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: textColor.withValues(alpha: 0.7))),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: TabBarView(

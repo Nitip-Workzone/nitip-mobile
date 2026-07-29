@@ -68,6 +68,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
   Future<void>? _balanceFuture;
 
   Future<void> fetchBalance({bool force = false}) async {
+    if (_disposed || !mounted) return;
     if (state.hasFetched && !force) return;
     if (_balanceFuture != null) return _balanceFuture;
 
@@ -101,9 +102,11 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }
 
   Future<void> fetchTransactions() async {
+    if (_disposed || !mounted) return;
     state = state.copyWith(isLoading: true, error: null, currentPage: 1, transactions: []);
     try {
       final transactions = await _repository.getTransactions(page: 1, limit: _limit);
+      if (_disposed || !mounted) return;
       state = state.copyWith(
         isLoading: false,
         transactions: transactions,
@@ -111,17 +114,19 @@ class WalletNotifier extends StateNotifier<WalletState> {
         hasMore: transactions.length == _limit,
       );
     } catch (e) {
+      if (_disposed || !mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> loadMoreTransactions() async {
+    if (_disposed || !mounted) return;
     if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
-
     state = state.copyWith(isLoadingMore: true, error: null);
     try {
       final nextPage = state.currentPage + 1;
       final more = await _repository.getTransactions(page: nextPage, limit: _limit);
+      if (_disposed || !mounted) return;
       state = state.copyWith(
         isLoadingMore: false,
         transactions: [...state.transactions, ...more],
@@ -129,40 +134,49 @@ class WalletNotifier extends StateNotifier<WalletState> {
         hasMore: more.length == _limit,
       );
     } catch (e) {
+      if (_disposed || !mounted) return;
       state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 
   Future<WalletTransactionModel?> topUp(double amount) async {
+    if (_disposed || !mounted) return null;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final tx = await _repository.initiateTopUp(amount);
-      // Refresh balance (walaupun mungkin masih PENDING, agar sinkron dengan BE)
+      if (_disposed || !mounted) return tx;
       await fetchBalance(force: true);
       return tx;
     } catch (e) {
+      if (_disposed || !mounted) return null;
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }
   }
 
   Future<WalletTransactionModel?> checkTransactionStatus(String reference) async {
+    if (_disposed || !mounted) return null;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final tx = await _repository.getTransactionStatus(reference);
-      // Sinkronkan balance jika status sudah berubah
+      if (_disposed || !mounted) return tx;
       await fetchBalance(force: true);
-      await fetchTransactions(); // Refresh list if we are on the transaction page
+      if (_disposed || !mounted) return tx;
+      await fetchTransactions();
+      if (_disposed || !mounted) return tx;
       state = state.copyWith(isLoading: false);
       return tx;
     } catch (e) {
+      if (_disposed || !mounted) return null;
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }
   }
 
   Future<void> refreshAfterTransaction() async {
+    if (_disposed || !mounted) return;
     await fetchBalance(force: true);
+    if (_disposed || !mounted) return;
     await fetchTransactions();
   }
 
@@ -170,15 +184,18 @@ class WalletNotifier extends StateNotifier<WalletState> {
     required String channelCode,
     required String accountNo,
   }) async {
+    if (_disposed || !mounted) return null;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final name = await _repository.inquiryAccount(
         channelCode: channelCode,
         accountNo: accountNo,
       );
+      if (_disposed || !mounted) return name;
       state = state.copyWith(isLoading: false);
       return name;
     } catch (e) {
+      if (_disposed || !mounted) return null;
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }
@@ -190,6 +207,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     required String pin,
     required Map<String, dynamic> metadata,
   }) async {
+    if (_disposed || !mounted) return null;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final tx = await _repository.requestWithdrawal(
@@ -198,10 +216,13 @@ class WalletNotifier extends StateNotifier<WalletState> {
         pin: pin,
         metadata: metadata,
       );
+      if (_disposed || !mounted) return tx;
       await fetchBalance(force: true);
+      if (_disposed || !mounted) return tx;
       await fetchTransactions();
       return tx;
     } catch (e) {
+      if (_disposed || !mounted) return null;
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }

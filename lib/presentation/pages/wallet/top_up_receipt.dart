@@ -100,7 +100,7 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Gagal memverifikasi status pembayaran.'), backgroundColor: AppColors.error),
         );
       }
     } finally {
