@@ -201,17 +201,30 @@ class OrderCard extends StatelessWidget {
   }
 
   Color _getStatusColor(String status) {
+    // Unified 3-POV clear mapping — no grey orphan for cooking/ready/merchant_accepted
     switch (status.toLowerCase()) {
       case 'pending':
         return AppColors.warning;
+      case 'merchant_accepted':
+        return Colors.orange; // Mencari Runner — orange distinct
+      case 'cooking':
+        return Colors.blue; // Sedang Dimasak
+      case 'ready':
+        return Colors.indigo; // Siap Diambil
       case 'accepted':
+        return AppColors.primary; // Diterima Runner — always runner, not dapur
+      case 'purchasing':
+        return Colors.purple;
+      case 'delivering':
       case 'on_progress':
+        return Colors.deepOrange;
       case 'started':
         return AppColors.primary;
       case 'completed':
         return AppColors.success;
       case 'cancelled':
       case 'rejected':
+      case 'expired':
         return AppColors.error;
       default:
         return AppColors.textMuted;

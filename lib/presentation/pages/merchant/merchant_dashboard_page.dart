@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/crash_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/merchant_refresh_provider.dart';
 
 class MerchantDashboardPage extends ConsumerStatefulWidget {
   const MerchantDashboardPage({super.key});
@@ -233,12 +234,14 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
             description: error.description,
             failingUrl: error.url?.toString(),
           );
-          if (mounted) {
-            setState(() {
-              _hasError = true;
-              _isLoading = false;
-              _lastErrorDetails = 'Gagal memuat. Periksa koneksi internet Anda.';
-            });
+          if (error.isForMainFrame ?? true) {
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+                _isLoading = false;
+                _lastErrorDetails = 'Gagal memuat. Periksa koneksi internet Anda.';
+              });
+            }
           }
         },
       ))
@@ -297,6 +300,21 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(merchantRefreshEventProvider, (prev, next) {
+      if (next > 0 && _webViewController != null) {
+        debugPrint('[WebView-Merchant] Auto-refresh triggered by FCM...');
+        _webViewController!.reload();
+      }
+    });
+
+    ref.listen(merchantTargetUrlProvider, (prev, next) {
+      if (next != null && next.isNotEmpty && _webViewController != null) {
+        debugPrint('[WebView-Merchant] Loading target URL: $next');
+        _webViewController!.loadRequest(Uri.parse(next));
+        ref.read(merchantTargetUrlProvider.notifier).state = null;
+      }
+    });
+
     final authState = ref.watch(authProvider);
     final token = authState.accessToken;
     if (token != null && token.isNotEmpty && _loadedToken != null && _loadedToken != token) {

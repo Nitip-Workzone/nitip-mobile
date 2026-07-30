@@ -139,8 +139,13 @@ class WalletRepositoryImpl implements WalletRepository {
   Future<UserBankAccountModel?> getRegisteredBankAccount() async {
     try {
       final response = await apiClient.dio.get('/users/me/bank-account');
-      if (response.data['success'] == true && response.data['data'] != null) {
-        return UserBankAccountModel.fromJson(response.data['data']);
+      // Backend now returns 200 with success=true and data=null when not registered
+      // Keep 404 handling for backward compatibility
+      if (response.data['success'] == true) {
+        if (response.data['data'] != null) {
+          return UserBankAccountModel.fromJson(response.data['data']);
+        }
+        return null;
       }
       return null;
     } on DioException catch (e) {

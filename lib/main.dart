@@ -32,6 +32,8 @@ import 'presentation/pages/support/support_new_ticket_page.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/wallet_provider.dart';
 import 'presentation/providers/notification_provider.dart';
+import 'core/config/app_config.dart';
+import 'presentation/providers/merchant_refresh_provider.dart';
 
 class AuthStatus {
   final bool isInitialized;
@@ -290,6 +292,23 @@ void main() async {
 
   final container = ProviderContainer();
 
+  void handleNotificationTap(RemoteMessage message, ProviderContainer container) {
+    final data = message.data;
+    final orderId = data['order_id'];
+    if (orderId == null || orderId.toString().isEmpty) return;
+
+    final authState = container.read(authProvider);
+    final isMerchant = authState.user?.isMerchant ?? false;
+
+    if (isMerchant || data['type'] == 'merchant_order') {
+      final targetUrl = '${AppConfig.webBaseUrl}/merchant/orders';
+      container.read(merchantTargetUrlProvider.notifier).state = targetUrl;
+    } else {
+      final router = container.read(routerProvider);
+      router.push('/orders/detail/$orderId');
+    }
+  }
+
   // 1. FOREGROUND: Listen to FCM messages when app is in foreground
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     debugPrint('[FCM-FOREGROUND] Title: ${message.notification?.title}');
@@ -303,6 +322,9 @@ void main() async {
     if (message.data['type'] == 'wallet_update') {
       debugPrint('[FCM-FOREGROUND] Triggering wallet balance refresh...');
       container.read(walletProvider.notifier).fetchBalance(force: true);
+    } else if (message.data['type'] == 'merchant_order') {
+      debugPrint('[FCM-FOREGROUND] Triggering merchant webview auto-refresh...');
+      container.read(merchantRefreshEventProvider.notifier).state++;
     }
     
     // Always refresh notification count
@@ -312,18 +334,24 @@ void main() async {
   // 2. BACKGROUND (app open but backgrounded): User taps notification
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     debugPrint('[FCM-OPENED] User tapped notification: ${message.data}');
-    // Refresh notification list
     container.read(notificationProvider.notifier).fetchNotifications();
-    // Navigation can be handled here (e.g., go to order detail)
+    handleNotificationTap(message, container);
   });
 
   // 3. TERMINATED: App opened from terminated state via notification
   final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
     debugPrint('[FCM-INITIAL] App opened from terminated via notification: ${initialMessage.data}');
-    // Delayed navigation after app is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       container.read(notificationProvider.notifier).fetchNotifications();
+      Future.doWhile(() async {
+        await Future.delayed(const Duration(milliseconds: 200));
+        return !container.read(authProvider).isInitialized;
+      }).then((_) {
+        if (container.read(authProvider).isAuthenticated) {
+          handleNotificationTap(initialMessage, container);
+        }
+      });
     });
   }
   
