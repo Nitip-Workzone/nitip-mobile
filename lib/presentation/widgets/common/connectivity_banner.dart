@@ -12,28 +12,36 @@ class ConnectivityBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final connectivityStatus = ref.watch(connectivityProvider);
-    final isOffline = connectivityStatus == ConnectivityStatus.isDisconnected;
+    final connectivityState = ref.watch(connectivityProvider);
+    final isOffline = connectivityState.status == ConnectivityStatus.isDisconnected;
+    final isPoor = connectivityState.isPoorConnection && !isOffline;
+
+    final showBanner = isOffline || isPoor;
+    final bannerColor = isOffline
+        ? AppColors.error.withValues(alpha: 0.9)
+        : Colors.orange.shade800.withValues(alpha: 0.9);
+    final bannerIcon = isOffline ? Icons.wifi_off_rounded : Icons.wifi_tethering_error_rounded;
+    final bannerText = isOffline ? 'Tidak ada koneksi internet' : 'Koneksi internet lambat / tidak stabil';
 
     return Column(
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
-          height: isOffline ? 36 : 0,
-          child: isOffline
+          height: showBanner ? 36 : 0,
+          child: showBanner
               ? Container(
                   width: double.infinity,
-                  color: AppColors.error.withValues(alpha: 0.9),
+                  color: bannerColor,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.wifi_off_rounded, color: Colors.white, size: 14),
-                      SizedBox(width: 8),
+                      Icon(bannerIcon, color: Colors.white, size: 14),
+                      const SizedBox(width: 8),
                       Text(
-                        'Tidak ada koneksi internet',
-                        style: TextStyle(
+                        bannerText,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

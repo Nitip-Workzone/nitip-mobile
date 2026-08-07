@@ -10,8 +10,9 @@ class ApiClient {
   late Dio dio;
   final _storage = const FlutterSecureStorage();
   final Future<void> Function()? onSessionExpired;
+  final Function(bool isPoor)? onPoorConnectionChanged;
 
-  ApiClient({this.onSessionExpired}) {
+  ApiClient({this.onSessionExpired, this.onPoorConnectionChanged}) {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -24,6 +25,34 @@ class ApiClient {
         },
       ),
     );
+
+    // Latency tracking interceptor to detect poor connection
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        options.extra['startTime'] = DateTime.now().millisecondsSinceEpoch;
+        return handler.next(options);
+      },
+      onResponse: (response, handler) {
+        final startTime = response.requestOptions.extra['startTime'] as int?;
+        if (startTime != null) {
+          final duration = DateTime.now().millisecondsSinceEpoch - startTime;
+          if (duration > 3000) {
+            onPoorConnectionChanged?.call(true);
+          } else if (duration < 1500) {
+            onPoorConnectionChanged?.call(false);
+          }
+        }
+        return handler.next(response);
+      },
+      onError: (e, handler) {
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout) {
+          onPoorConnectionChanged?.call(true);
+        }
+        return handler.next(e);
+      },
+    ));
 
     // Tambahkan interceptor untuk token & koneksi
     dio.interceptors.add(InterceptorsWrapper(

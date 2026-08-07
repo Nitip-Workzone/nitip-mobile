@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -37,11 +38,52 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
   final GlobalKey _qrKey = GlobalKey();
   bool _isChecking = false;
   bool _isSaving = false;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     tx = widget.initialTx;
+    if (tx.status == 'pending') {
+      _startPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (tx.reference == null) return;
+      if (tx.status != 'pending') {
+        _pollingTimer?.cancel();
+        return;
+      }
+      
+      final updatedTx = await ref.read(walletProvider.notifier).checkTransactionStatus(tx.reference!);
+      
+      if (mounted && updatedTx != null && updatedTx.status != tx.status) {
+        setState(() {
+          tx = updatedTx;
+        });
+        
+        if (tx.status == 'completed') {
+          _pollingTimer?.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pembayaran berhasil!'), backgroundColor: AppColors.success),
+          );
+        } else if (tx.status == 'failed') {
+          _pollingTimer?.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pembayaran gagal.'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    });
   }
 
   Future<void> _checkStatus() async {
@@ -59,10 +101,12 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
       });
       
       if (tx.status == 'completed') {
+        _pollingTimer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pembayaran berhasil!'), backgroundColor: AppColors.success),
         );
       } else if (tx.status == 'failed') {
+        _pollingTimer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pembayaran gagal.'), backgroundColor: AppColors.error),
         );

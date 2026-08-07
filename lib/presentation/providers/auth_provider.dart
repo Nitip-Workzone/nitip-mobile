@@ -43,6 +43,9 @@ final apiClientProvider = Provider<ApiClient>((ref) {
         }
       });
     },
+    onPoorConnectionChanged: (isPoor) {
+      ref.read(connectivityProvider.notifier).setPoorConnection(isPoor);
+    },
   );
 });
 

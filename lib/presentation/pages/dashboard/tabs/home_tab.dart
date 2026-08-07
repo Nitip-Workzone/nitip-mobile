@@ -66,7 +66,7 @@ class HomeTab extends ConsumerWidget {
               onRefresh: () async {
                 await Future.wait([
                   ref.read(authProvider.notifier).refreshProfile(),
-                  ref.read(walletProvider.notifier).fetchBalance(),
+                  ref.read(walletProvider.notifier).fetchBalance(force: true),
                   ref.read(notificationProvider.notifier).fetchUnreadCount(),
                   ref.read(activityProvider.notifier).fetchActivities(),
                 ]);
@@ -162,7 +162,14 @@ class HomeTab extends ConsumerWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    _NotificationButton(notifCount: notifState.unreadCount, primary: primary),
+                                    _NotificationButton(
+                                      notifCount: notifState.unreadCount,
+                                      primary: primary,
+                                      onTap: () async {
+                                        await context.push('/notifications');
+                                        ref.read(walletProvider.notifier).fetchBalance(force: true);
+                                      },
+                                    ),
                                   ],
                                 ),
 
@@ -190,8 +197,14 @@ class HomeTab extends ConsumerWidget {
                                   isLoading: walletState.isLoading,
                                   currencyFormat: currencyFormat,
                                   onTopUp: () => showTopUpSheet(context, ref, primary),
-                                  onWithdraw: () => context.push('/wallet/withdraw'),
-                                  onHistory: () => context.push('/wallet/history'),
+                                  onWithdraw: () async {
+                                    await context.push('/wallet/withdraw');
+                                    ref.read(walletProvider.notifier).fetchBalance(force: true);
+                                  },
+                                  onHistory: () async {
+                                    await context.push('/wallet/history');
+                                    ref.read(walletProvider.notifier).fetchBalance(force: true);
+                                  },
                                 ),
 
                                 const SizedBox(height: 32),
@@ -238,7 +251,10 @@ class HomeTab extends ConsumerWidget {
                                 _TodayOrderList(
                                   activityState: activityState,
                                   primary: primary,
-                                  onTapOrder: (orderId) => context.push('/orders/detail/$orderId'),
+                                  onTapOrder: (orderId) async {
+                                    await context.push('/orders/detail/$orderId');
+                                    ref.read(walletProvider.notifier).fetchBalance(force: true);
+                                  },
                                 ),
                                 
                                 const SizedBox(height: 40),
@@ -334,13 +350,14 @@ class _StatusPill extends StatelessWidget {
 class _NotificationButton extends StatelessWidget {
   final int notifCount;
   final Color primary;
+  final VoidCallback onTap;
 
-  const _NotificationButton({required this.notifCount, required this.primary});
+  const _NotificationButton({required this.notifCount, required this.primary, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/notifications'),
+      onTap: onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -507,14 +524,26 @@ class _QuickActionsGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildCategoryGroup(outerContext, 'Tugas & Pendapatan', [
-          _ActionData(Icons.search_rounded, 'Cari Order', () => outerContext.push('/orders/explore')),
-          _ActionData(Icons.history_rounded, 'Riwayat Saldo', () => outerContext.push('/wallet/history')),
-          _ActionData(Icons.payments_rounded, 'Tarik Saldo', () => outerContext.push('/wallet/withdraw')),
+          _ActionData(Icons.search_rounded, 'Cari Order', () async {
+            await outerContext.push('/orders/explore');
+            ref.read(walletProvider.notifier).fetchBalance(force: true);
+          }),
+          _ActionData(Icons.history_rounded, 'Riwayat Saldo', () async {
+            await outerContext.push('/wallet/history');
+            ref.read(walletProvider.notifier).fetchBalance(force: true);
+          }),
+          _ActionData(Icons.payments_rounded, 'Tarik Saldo', () async {
+            await outerContext.push('/wallet/withdraw');
+            ref.read(walletProvider.notifier).fetchBalance(force: true);
+          }),
         ]),
         const SizedBox(height: 24),
         _buildCategoryGroup(outerContext, 'Akun & Saldo', [
           _ActionData(Icons.account_balance_wallet_rounded, 'Dompet', () => ref.read(dashboardIndexProvider.notifier).state = 2),
-          _ActionData(Icons.support_agent_rounded, 'Pusat Bantuan', () => outerContext.push('/faq')),
+          _ActionData(Icons.support_agent_rounded, 'Pusat Bantuan', () async {
+            await outerContext.push('/faq');
+            ref.read(walletProvider.notifier).fetchBalance(force: true);
+          }),
         ]),
       ],
     );
