@@ -221,7 +221,10 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
           }
         },
         onWebResourceError: (error) {
+          final errorUrl = error.url?.toString() ?? '';
           if (error.errorCode == -999 ||
+              errorUrl.contains('/api/') ||
+              errorUrl.contains('/stream') ||
               error.description.contains('ERR_CACHE_MISS') ||
               error.description.contains('Frame load interrupted') ||
               error.description.contains('cache') ||

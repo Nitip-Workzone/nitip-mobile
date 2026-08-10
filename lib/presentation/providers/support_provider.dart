@@ -60,7 +60,6 @@ class SupportState {
 class SupportNotifier extends StateNotifier<SupportState> {
   final SupportRepository _repo;
   final Ref _ref;
-  Timer? _pollingTimer;
 
   SupportNotifier(this._repo, this._ref) : super(SupportState());
 

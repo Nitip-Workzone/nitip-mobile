@@ -8,6 +8,8 @@ class SupportTicketModel {
   final String status;
   final int priority;
   final String? assignedCsId;
+  final String? assignedCsName;
+  final String? assignedCsWhatsapp;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +23,8 @@ class SupportTicketModel {
     required this.status,
     required this.priority,
     this.assignedCsId,
+    this.assignedCsName,
+    this.assignedCsWhatsapp,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -36,6 +40,8 @@ class SupportTicketModel {
       status: json['status'] ?? 'queued',
       priority: json['priority'] ?? 1,
       assignedCsId: json['assigned_cs_id'],
+      assignedCsName: json['assigned_cs_name'],
+      assignedCsWhatsapp: json['assigned_cs_whatsapp'],
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
     );
