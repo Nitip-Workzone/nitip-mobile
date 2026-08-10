@@ -227,6 +227,23 @@ class WalletNotifier extends StateNotifier<WalletState> {
       return null;
     }
   }
+
+  Future<bool> cancelWithdrawal(String transactionId) async {
+    if (_disposed || !mounted) return false;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repository.cancelWithdrawal(transactionId);
+      if (_disposed || !mounted) return true;
+      await fetchBalance(force: true);
+      if (_disposed || !mounted) return true;
+      await fetchTransactions();
+      return true;
+    } catch (e) {
+      if (_disposed || !mounted) return false;
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
 }
 
 // Provider untuk WalletNotifier

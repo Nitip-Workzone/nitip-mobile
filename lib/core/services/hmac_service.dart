@@ -21,13 +21,18 @@ class HmacService {
     required String body,
   }) {
     final timestamp = DateTime.now().toUtc().toIso8601String();
-    final bodyHash = sha256.convert(utf8.encode(body)).toString();
-    final payload = '$timestamp.$bodyHash';
-
-    final hmacBytes = Hmac(sha256, utf8.encode(apiSecret))
-        .convert(utf8.encode(payload))
-        .bytes;
-    final signature = hmacBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    
+    final String signature;
+    if (apiSecret.isEmpty) {
+      signature = '';
+    } else {
+      final bodyHash = sha256.convert(utf8.encode(body)).toString();
+      final payload = '$timestamp.$bodyHash';
+      final hmacBytes = Hmac(sha256, utf8.encode(apiSecret))
+          .convert(utf8.encode(payload))
+          .bytes;
+      signature = hmacBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    }
 
     return {
       'X-API-Key': apiKey,

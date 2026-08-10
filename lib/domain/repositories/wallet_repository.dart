@@ -17,4 +17,5 @@ abstract class WalletRepository {
     required Map<String, dynamic> metadata,
   });
   Future<UserBankAccountModel?> getRegisteredBankAccount();
+  Future<void> cancelWithdrawal(String transactionId);
 }

@@ -14,6 +14,7 @@ import './wallet_provider.dart';
 import './notification_provider.dart';
 import './activity_provider.dart';
 import './location_provider.dart';
+import './connectivity_provider.dart';
 
 // Provider untuk ApiClient dengan session expired callback
 // Untuk menghindari cycle authProvider -> authRepositoryProvider -> apiClientProvider -> authProvider,

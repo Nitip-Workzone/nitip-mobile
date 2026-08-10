@@ -18,8 +18,8 @@ class AppConfig {
     defaultValue: '',
   );
 
-  /// Cek apakah API credentials sudah dikonfigurasi
-  static bool get hasApiCredentials => apiKey.isNotEmpty && apiSecret.isNotEmpty;
+  /// Cek apakah API credentials sudah dikonfigurasi (apiSecret bersifat opsional karena di-bypass oleh backend untuk platform mobile)
+  static bool get hasApiCredentials => apiKey.isNotEmpty;
 
   static const String _webBaseUrlEnv = String.fromEnvironment(
     'WEB_BASE_URL',

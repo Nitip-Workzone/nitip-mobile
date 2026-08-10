@@ -1,3 +1,4 @@
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/notification_model.dart';
 import '../../domain/repositories/notification_repository.dart';
@@ -47,6 +48,8 @@ class NotificationState {
 
 class NotificationNotifier extends StateNotifier<NotificationState> {
   final NotificationRepository _repository;
+  final _localNotifications = FlutterLocalNotificationsPlugin();
+  final Set<String> _notifiedIds = {};
 
   NotificationNotifier(this._repository) : super(NotificationState()) {
     // Only fetch unread count on initialization for dashboard badge.
@@ -54,10 +57,54 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
     fetchUnreadCount();
   }
 
-  Future<void> fetchNotifications() async {
+  void showLocalNotification(NotificationModel notif) {
+    const androidDetails = AndroidNotificationDetails(
+      'nitip_iconic_notifications_v1',
+      'Nitip Iconic Notifications',
+      channelDescription: 'Notifikasi penting dengan suara ikonik Nitip',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound('nitip_chime'),
+      icon: '@mipmap/launcher_icon',
+    );
+
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'nitip_chime.wav',
+      ),
+    );
+
+    _localNotifications.show(
+      notif.id.hashCode,
+      notif.title,
+      notif.message,
+      details,
+      payload: notif.metadata.toString(),
+    );
+  }
+
+  Future<void> fetchNotifications({bool playSound = false}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final notifications = await _repository.getNotifications();
+      
+      if (playSound) {
+        final newUnread = notifications.where((n) => !n.isRead && !_notifiedIds.contains(n.id)).toList();
+        for (final notif in newUnread) {
+          _notifiedIds.add(notif.id);
+          showLocalNotification(notif);
+        }
+      } else {
+        for (final notif in notifications) {
+          _notifiedIds.add(notif.id);
+        }
+      }
+
       state = state.copyWith(isLoading: false, hasFetched: true, notifications: notifications);
     } catch (e) {
       state = state.copyWith(isLoading: false, hasFetched: true, error: e.toString());

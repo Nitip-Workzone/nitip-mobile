@@ -164,7 +164,7 @@ class ApiClient {
   /// Grant token diperlukan untuk login dan refresh.
   Future<String?> _getGrantToken() async {
     if (!AppConfig.hasApiCredentials) {
-      debugPrint('[AUTH] API credentials not configured! Set API_KEY and API_SECRET via --dart-define');
+      debugPrint('[AUTH] API key not configured! Set API_KEY via --dart-define');
       return null;
     }
 
@@ -190,6 +190,9 @@ class ApiClient {
       }
     } on DioException catch (e) {
       debugPrint('[AUTH] Failed to get grant token: ${e.response?.statusCode} - ${e.message}');
+      if (e.response?.data != null) {
+        debugPrint('[AUTH] Error Response Body: ${e.response?.data}');
+      }
     } catch (e) {
       debugPrint('[AUTH] Unexpected error getting grant token: $e');
     }

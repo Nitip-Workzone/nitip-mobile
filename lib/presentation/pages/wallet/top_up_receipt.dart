@@ -154,6 +154,57 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
     }
   }
 
+  Future<void> _confirmCancelWithdrawal(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Batalkan Penarikan', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Apakah Anda yakin ingin membatalkan penarikan sebesar ${_currencyFmt.format(tx.amount.abs())}? Saldo Anda akan dikembalikan secara penuh.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Kembali', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Batalkan', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = true; // Gunakan _isSaving sebagai generic loading flag untuk proses async pembatalan di sheet
+      });
+      final success = await ref.read(walletProvider.notifier).cancelWithdrawal(tx.id.toString());
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+      if (!context.mounted) return;
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Permintaan penarikan berhasil dibatalkan'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context); // Tutup bottom sheet detail
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal membatalkan penarikan'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Color get _statusColor {
     switch (tx.status) {
       case 'completed': return AppColors.success;
@@ -183,9 +234,18 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
       return 'Silakan scan kode QRIS berikut untuk menyelesaikan pembayaran.';
     }
     switch (tx.status) {
-      case 'completed': return 'Top up telah berhasil dan saldo kamu sudah bertambah.';
-      case 'failed': return 'Top up gagal diproses. Silakan coba lagi.';
-      default: return 'Top up sedang menunggu konfirmasi dari admin. Saldo akan masuk setelah disetujui.';
+      case 'completed': 
+        return tx.type == 'WITHDRAWAL' 
+            ? 'Penarikan telah berhasil disetujui dan dikirim.' 
+            : 'Top up telah berhasil dan saldo kamu sudah bertambah.';
+      case 'failed': 
+        return tx.type == 'WITHDRAWAL' 
+            ? 'Penarikan gagal diproses.' 
+            : 'Top up gagal diproses. Silakan coba lagi.';
+      default: 
+        return tx.type == 'WITHDRAWAL' 
+            ? 'Penarikan sedang menunggu persetujuan admin. Dana akan segera dikirim.' 
+            : 'Top up sedang menunggu konfirmasi dari admin. Saldo akan masuk setelah disetujui.';
     }
   }
 
@@ -327,8 +387,8 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
               ),
               child: Column(
                 children: [
-                  const Text('Nominal Top Up',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  Text(tx.type == 'WITHDRAWAL' ? 'Nominal Penarikan' : 'Nominal Top Up',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
                   const SizedBox(height: 6),
                   Text(
                     _currencyFmt.format(tx.amount),
@@ -358,7 +418,25 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
             const SizedBox(height: 24),
 
             // ── CTA ───────────────────────────────────────────────────────
-            if (!showQr)
+            if (!showQr) ...[
+              if (tx.type == 'WITHDRAWAL' && tx.status == 'pending') ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: _isSaving ? null : () => _confirmCancelWithdrawal(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red))
+                        : const Text('Batalkan Penarikan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -373,6 +451,7 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
                   child: const Text('Selesai', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
               ),
+            ],
           ],
         ),
       ),

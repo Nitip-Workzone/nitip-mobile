@@ -156,4 +156,17 @@ class WalletRepositoryImpl implements WalletRepository {
       throw Exception(message);
     }
   }
+
+  @override
+  Future<void> cancelWithdrawal(String transactionId) async {
+    try {
+      final response = await apiClient.dio.post('/wallets/withdrawals/$transactionId/cancel');
+      if (response.data['success'] != true) {
+        throw Exception(response.data['message'] ?? 'Gagal membatalkan penarikan');
+      }
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
+  }
 }

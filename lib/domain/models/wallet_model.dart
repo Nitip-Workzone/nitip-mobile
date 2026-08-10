@@ -33,6 +33,7 @@ class WalletTransactionModel {
   final String? reference;
   final String status;
   final String? qrisString;
+  final Map<String, dynamic>? destinationMetadata;
   final DateTime createdAt;
 
   WalletTransactionModel({
@@ -44,6 +45,7 @@ class WalletTransactionModel {
     this.reference,
     required this.status,
     this.qrisString,
+    this.destinationMetadata,
     required this.createdAt,
   });
 
@@ -57,6 +59,7 @@ class WalletTransactionModel {
       reference: json['reference'],
       status: json['status'],
       qrisString: json['qris_string'],
+      destinationMetadata: json['destination_metadata'],
       createdAt: DateTime.parse(json['created_at']),
     );
   }

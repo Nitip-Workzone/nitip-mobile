@@ -64,12 +64,10 @@ class HomeTab extends ConsumerWidget {
           SafeArea(
             child: RefreshIndicator(
               onRefresh: () async {
-                await Future.wait([
-                  ref.read(authProvider.notifier).refreshProfile(),
-                  ref.read(walletProvider.notifier).fetchBalance(force: true),
-                  ref.read(notificationProvider.notifier).fetchUnreadCount(),
-                  ref.read(activityProvider.notifier).fetchActivities(),
-                ]);
+                await ref.read(authProvider.notifier).refreshProfile();
+                await ref.read(walletProvider.notifier).fetchBalance(force: true);
+                await ref.read(notificationProvider.notifier).fetchUnreadCount();
+                await ref.read(activityProvider.notifier).fetchActivities();
               },
               color: primary,
               child: isLoading

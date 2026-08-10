@@ -4,6 +4,8 @@ import '../../data/models/support_ticket_model.dart';
 import '../../data/repositories/support_repository_impl.dart';
 import '../../domain/repositories/support_repository.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
+import '../../data/models/notification_model.dart';
 
 final supportRepositoryProvider = Provider<SupportRepository>((ref) {
   final apiClient = ref.watch(apiClientProvider);
@@ -57,93 +59,102 @@ class SupportState {
 
 class SupportNotifier extends StateNotifier<SupportState> {
   final SupportRepository _repo;
+  final Ref _ref;
   Timer? _pollingTimer;
 
-  SupportNotifier(this._repo) : super(SupportState());
+  SupportNotifier(this._repo, this._ref) : super(SupportState());
 
   Future<void> fetchMyTickets() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
       final tickets = await _repo.getMyTickets();
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, tickets: tickets);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> fetchTicketDetail(String id) async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true);
     try {
       final ticket = await _repo.getTicketDetail(id);
+      if (!mounted) return;
       state = state.copyWith(currentTicket: ticket, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> fetchMessages(String ticketId, {bool isInitial = true}) async {
-    if (isInitial) state = state.copyWith(isMessagesLoading: true);
+    if (isInitial) {
+      if (!mounted) return;
+      state = state.copyWith(isMessagesLoading: true);
+    }
     try {
       String? afterId;
       if (!isInitial && state.messages.isNotEmpty) {
         afterId = state.messages.last.id;
       }
       final msgs = await _repo.getMessages(ticketId, afterId: afterId);
+      if (!mounted) return;
       if (isInitial) {
         state = state.copyWith(messages: msgs, isMessagesLoading: false);
       } else {
         if (msgs.isNotEmpty) {
-          state = state.copyWith(messages: [...state.messages, ...msgs]);
+          final newMsgs = msgs.where((m) => !state.messages.any((existing) => existing.id == m.id)).toList();
+          if (newMsgs.isNotEmpty) {
+            state = state.copyWith(messages: [...state.messages, ...newMsgs]);
+            
+            // Play local notification sound if new CS/Admin reply is received
+            final hasNewCsMsg = newMsgs.any((m) => m.senderRole == 'cs' || m.senderRole == 'admin');
+            if (hasNewCsMsg) {
+              final lastMsg = newMsgs.last;
+              _ref.read(notificationProvider.notifier).showLocalNotification(
+                NotificationModel(
+                  id: lastMsg.id,
+                  userId: '',
+                  title: 'Bantuan Nitip',
+                  message: lastMsg.message,
+                  type: 'chat',
+                  isRead: false,
+                  metadata: {'ticket_id': ticketId},
+                  createdAt: DateTime.now(),
+                ),
+              );
+            }
+          }
         }
       }
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isMessagesLoading: false);
     }
   }
 
-  int _pollingFailCount = 0;
-
   void startPolling(String ticketId) {
-    stopPolling();
-    _pollingFailCount = 0;
-    // P1: backoff 5s base, + incremental if fail, stops on background via lifecycle observer in page
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      try {
-        await fetchMessages(ticketId, isInitial: false);
-        _pollingFailCount = 0;
-      } catch (_) {
-        _pollingFailCount++;
-        // Exponential backoff up to 30s if repeated fails (prod 512M safety)
-        if (_pollingFailCount >= 3) {
-          stopPolling();
-          final backoff = Duration(seconds: (5 * (1 << (_pollingFailCount - 3))).clamp(5, 30));
-          _pollingTimer = Timer.periodic(backoff, (_) async {
-            try {
-              await fetchMessages(ticketId, isInitial: false);
-              // Reset to 5s on success
-              startPolling(ticketId);
-            } catch (_) {
-              // keep backoff
-            }
-          });
-        }
-      }
-    });
+    // Polling disabled to reduce server load
   }
 
   void stopPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    // Polling disabled
   }
 
   Future<SupportTicketModel?> createTicket(Map<String, dynamic> payload) async {
+    if (!mounted) return null;
     state = state.copyWith(isLoading: true);
     try {
       final ticket = await _repo.createTicket(payload);
       await fetchMyTickets();
+      if (!mounted) return ticket;
       state = state.copyWith(isLoading: false);
       return ticket;
     } catch (e) {
+      if (!mounted) return null;
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }
@@ -152,6 +163,7 @@ class SupportNotifier extends StateNotifier<SupportState> {
   Future<void> sendMessage(String ticketId, String message) async {
     try {
       final msg = await _repo.sendMessage(ticketId, message);
+      if (!mounted) return;
       state = state.copyWith(messages: [...state.messages, msg]);
     } catch (e) {
       rethrow;
@@ -172,5 +184,5 @@ class SupportNotifier extends StateNotifier<SupportState> {
 
 final supportProvider = StateNotifierProvider<SupportNotifier, SupportState>((ref) {
   final repo = ref.watch(supportRepositoryProvider);
-  return SupportNotifier(repo);
+  return SupportNotifier(repo, ref);
 });

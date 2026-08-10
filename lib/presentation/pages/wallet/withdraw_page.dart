@@ -7,10 +7,12 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/wallet_provider.dart';
 import '../../providers/biometric_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../../domain/models/wallet_model.dart';
 import '../../widgets/wallet/withdraw_inquiry_card.dart';
 import '../../widgets/wallet/pin_input_sheet.dart';
 import '../auth/pin_setup_page.dart';
+import 'top_up_receipt.dart';
 
 class WithdrawPage extends ConsumerStatefulWidget {
   const WithdrawPage({super.key});
@@ -30,6 +32,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
   WithdrawalChannelModel? _selectedChannel;
   final _accountController = TextEditingController();
   String? _inquiryName;
+  String _selectedType = 'TRANSFER'; // 'TRANSFER' or 'CASH'
 
   final _presets = [50000, 100000, 200000, 500000, 1000000];
 
@@ -43,6 +46,14 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     'DANA': 'assets/images/providers/dana.png',
     'SHOPEEPAY': 'assets/images/providers/shopeepay.png',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(walletProvider.notifier).fetchTransactions();
+    });
+  }
 
   @override
   void dispose() {
@@ -166,6 +177,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
           );
       if (mounted) {
         if (tx != null) {
+          ref.read(notificationProvider.notifier).fetchNotifications(playSound: true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Permintaan penarikan berhasil diajukan'),
@@ -186,102 +198,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     }
   }
 
-  void _showChannelSelector(List<WithdrawalChannelModel> channels, Color primary) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Pilih Metode Pencairan',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => Navigator.pop(context),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: channels.length,
-                separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                itemBuilder: (context, index) {
-                  final ch = channels[index];
-                  final isSelected = _selectedChannel?.id == ch.id;
-                  final logoAsset = _brandLogos[ch.code.toUpperCase()];
-                  final isActive = ch.isActive;
 
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    leading: Container(
-                      width: 48,
-                      height: 48,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFF1F5F9)),
-                      ),
-                      child: logoAsset != null
-                          ? Image.asset(logoAsset, fit: BoxFit.contain)
-                          : Icon(ch.type == 'BANK' ? Icons.account_balance : Icons.smartphone, color: primary),
-                    ),
-                    title: Text(
-                      ch.name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: isActive ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                    subtitle: Text(
-                      isActive ? ch.estimatedTime : 'Sedang tidak tersedia',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isActive ? const Color(0xFF64748B) : Colors.red,
-                        fontWeight: isActive ? FontWeight.w500 : FontWeight.w700,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle, color: primary, size: 20)
-                        : (isActive ? const Icon(Icons.chevron_right, size: 16, color: Color(0xFFCBD5E1)) : null),
-                    onTap: isActive
-                        ? () {
-                            setState(() {
-                              _selectedChannel = ch;
-                              _inquiryName = null;
-                              _error = null;
-                            });
-                            Navigator.pop(context);
-                          }
-                        : null,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +208,43 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
     final primary = isRunner ? AppColors.secondary : AppColors.primary;
     final secondary = isRunner ? AppColors.secondaryDark : AppColors.primaryDark;
 
+    final pendingWithdrawals = walletState.transactions.where(
+      (tx) => tx.type == 'WITHDRAWAL' && tx.status == 'pending',
+    ).toList();
+
     final bankAccountAsync = ref.watch(userBankAccountProvider);
+    final channelsAsync = ref.watch(withdrawalChannelsProvider);
+
+    // Auto-select channel based on _selectedType and bank account
+    bankAccountAsync.whenData((bankAccount) {
+      channelsAsync.whenData((channels) {
+        if (channels.isNotEmpty) {
+          if (_selectedType == 'TRANSFER') {
+            if (bankAccount != null) {
+              final matched = channels.firstWhere(
+                (ch) => ch.code.toLowerCase() == bankAccount.bankName.toLowerCase(),
+                orElse: () => channels.first,
+              );
+              if (_selectedChannel?.id != matched.id) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  setState(() => _selectedChannel = matched);
+                });
+              }
+            }
+          } else if (_selectedType == 'CASH') {
+            final matched = channels.firstWhere(
+              (ch) => ch.code.toLowerCase() == 'manual',
+              orElse: () => channels.first,
+            );
+            if (_selectedChannel?.id != matched.id) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setState(() => _selectedChannel = matched);
+              });
+            }
+          }
+        }
+      });
+    });
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -453,6 +406,116 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                     ),
                   ),
 
+                  // ── Pending Withdrawal Progress Card ────────────────────────
+                  if (pendingWithdrawals.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.warning,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.schedule_rounded, color: Colors.white, size: 14),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    pendingWithdrawals.length > 1
+                                        ? 'Pencairan Sedang Diproses (${pendingWithdrawals.length})'
+                                        : 'Penarikan Sedang Diproses',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: pendingWithdrawals.length,
+                              separatorBuilder: (context, index) => const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                              ),
+                              itemBuilder: (context, index) {
+                                final tx = pendingWithdrawals[index];
+                                final isManual = tx.destinationMetadata?['code']?.toString().toLowerCase() == 'manual' || tx.destinationMetadata?['account_name'] == null;
+                                return InkWell(
+                                  onTap: () => showTopUpReceipt(context, tx),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Rp ${_fmt.format(tx.amount.abs())}',
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                isManual
+                                                    ? 'Tarik Tunai / Cash'
+                                                    : '${tx.destinationMetadata?['bank_name'] ?? 'Transfer'} (${tx.destinationMetadata?['account_no']})',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF64748B),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8), size: 18),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Ketuk salah satu baris untuk melihat struk / detail tiket progress pencairan.',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 20),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -586,25 +649,98 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
 
                   const SizedBox(height: 32),
 
-                  // ── Method Selection Dropdown ────────────────────────────────
+                  // ── Segmented Selector for Transfer vs Cash ────────────────
                   const Text('Metode Pencairan',
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9), // slate-100
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedType = 'TRANSFER';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedType == 'TRANSFER' ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: _selectedType == 'TRANSFER'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'Transfer Rekening',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: _selectedType == 'TRANSFER' ? const Color(0xFF1E293B) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedType = 'CASH';
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedType == 'CASH' ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: _selectedType == 'CASH'
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'Tarik Tunai (Cash)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: _selectedType == 'CASH' ? const Color(0xFF1E293B) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  ref.watch(withdrawalChannelsProvider).when(
-                    data: (channels) {
-                      // Auto-select channel matching registered account bank name if none selected yet
-                      if (_selectedChannel == null && channels.isNotEmpty) {
-                        final matched = channels.firstWhere(
-                          (ch) => ch.code.toLowerCase() == bankAccount.bankName.toLowerCase(),
-                          orElse: () => channels.first,
-                        );
-                        _selectedChannel = matched;
-                      }
 
-                      return InkWell(
-                        onTap: () => _showChannelSelector(channels, primary),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
+                  if (_selectedType == 'CASH') ...[
+                    channelsAsync.when(
+                      data: (channels) {
+                        return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8FAFC),
@@ -623,9 +759,13 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(color: const Color(0xFFF1F5F9)),
                                   ),
-                                  child: _brandLogos[_selectedChannel!.code.toUpperCase()] != null
-                                      ? Image.asset(_brandLogos[_selectedChannel!.code.toUpperCase()]!, fit: BoxFit.contain)
-                                      : Icon(Icons.account_balance, color: primary, size: 18),
+                                  child: Icon(
+                                    _selectedChannel!.code.toLowerCase() == 'manual'
+                                        ? Icons.payments_outlined
+                                        : Icons.account_balance,
+                                    color: primary,
+                                    size: 18,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -643,36 +783,19 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                                     ],
                                   ),
                                 ),
-                              ] else ...[
-                                const Icon(Icons.account_balance, color: Color(0xFF94A3B8), size: 24),
-                                const SizedBox(width: 16),
-                                const Expanded(
-                                  child: Text(
-                                    'Pilih Metode Pencairan',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                                  ),
-                                ),
                               ],
-                              const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 20),
+                              const Icon(Icons.lock_outline, color: Color(0xFF94A3B8), size: 18),
                             ],
                           ),
-                        ),
-                      );
-                    },
-                    loading: () => Container(
-                      height: 60,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                        );
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Gagal memuat metode: $e')),
                     ),
-                    error: (e, _) => Center(child: Text('Gagal memuat metode: $e')),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
 
-                  if (_selectedChannel != null) ...[
+                  if (_selectedChannel != null && _selectedType == 'TRANSFER') ...[
                     const SizedBox(height: 24),
                     const Text(
                       'Rekening Tujuan Terdaftar',

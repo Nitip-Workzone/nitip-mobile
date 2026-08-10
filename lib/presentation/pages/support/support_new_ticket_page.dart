@@ -52,7 +52,7 @@ class _SupportNewTicketPageState extends ConsumerState<SupportNewTicketPage> {
       });
       if (ticket != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tiket berhasil dibuat! Menunggu CS'), backgroundColor: AppColors.success));
-        context.go('/support/${ticket.id}');
+        context.pushReplacement('/support/${ticket.id}');
       }
     } catch (e) {
       if (mounted) {
