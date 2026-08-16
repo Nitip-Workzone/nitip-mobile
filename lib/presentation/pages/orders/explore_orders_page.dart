@@ -368,6 +368,33 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
       context.push('/orders/detail/$orderId');
     } else {
       final error = ref.read(exploreOrdersProvider).error ?? 'Gagal mengambil pesanan';
+      if (error.contains('KycRequiredException') || error.contains('KYC_REQUIRED') || error.contains('verifikasi e-KYC')) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Butuh Verifikasi e-KYC'),
+            content: const Text(
+              'Batas harian menerima pesanan untuk akun non-verifikasi telah tercapai.\n\n'
+              'Selesaikan verifikasi e-KYC (Facebook & Selfie) sekarang untuk mendapatkan akses tanpa batas!',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/kyc-intro');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+                child: const Text('Verifikasi Sekarang'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),

@@ -38,9 +38,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) return 'Format email tidak valid';
+    if (value == null || value.isEmpty) return 'Email atau nomor WhatsApp tidak boleh kosong';
+    if (value.contains('@')) {
+      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      if (!emailRegex.hasMatch(value)) return 'Format email tidak valid';
+    } else {
+      final cleanVal = value.replaceAll(RegExp(r'[\+\s\-\(\)]'), '');
+      if (cleanVal.isEmpty || !RegExp(r'^\d+$').hasMatch(cleanVal)) {
+        return 'Format email atau nomor WhatsApp tidak valid';
+      }
+      if (cleanVal.length < 9 || cleanVal.length > 15) {
+        return 'Nomor WhatsApp minimal 9 digit dan maksimal 15 digit';
+      }
+    }
     return null;
   }
 
@@ -131,20 +141,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Email
-                            const Text('Alamat Email', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
+                            const Text('Email atau Nomor WhatsApp', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _emailController,
                               validator: _validateEmail,
                               decoration: InputDecoration(
-                                hintText: 'email@gmail.com',
+                                hintText: 'email@gmail.com atau 0812xxxx',
                                 hintStyle: TextStyle(color: AppColors.textMuted.withValues(alpha: 0.5)),
                                 filled: true,
                                 fillColor: const Color(0xFFF8FAFC),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                               ),
-                              keyboardType: TextInputType.emailAddress,
+                              keyboardType: TextInputType.text,
                             ),
                             const SizedBox(height: 20),
                             

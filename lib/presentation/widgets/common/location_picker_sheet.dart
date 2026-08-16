@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:nitip_flutter_mobile/presentation/widgets/common/safe_webview_widget.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
@@ -88,6 +89,25 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             });
           } catch (e) {
             debugPrint('Error decoding WebView message: $e');
+          }
+        },
+      )
+      ..addJavaScriptChannel(
+        'StoreChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          // Store marker was selected — same effect as LocationChannel but also
+          // carries the store id and name for potential future use.
+          try {
+            final data = jsonDecode(message.message);
+            final lat = data['lat'] as double;
+            final lng = data['lng'] as double;
+            final address = data['address'] as String? ?? data['name'] as String;
+            setState(() {
+              _currentCenter = LatLng(lat, lng);
+              _currentAddress = address;
+            });
+          } catch (e) {
+            debugPrint('Error decoding StoreChannel message: $e');
           }
         },
       )
@@ -261,7 +281,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           Expanded(
             child: Stack(
               children: [
-                WebViewWidget(
+                SafeWebViewWidget(
                   controller: _webViewController,
                   gestureRecognizers: {
                     Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),

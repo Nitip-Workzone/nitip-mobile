@@ -533,6 +533,12 @@ _TxMeta _txMeta(String type) {
       return const _TxMeta('Dana Tahan (Escrow)', Icons.lock_rounded, Color(0xFFF59E0B));
     case 'ESCROW_RELEASE':
       return const _TxMeta('Dana Cair (Escrow)', Icons.lock_open_rounded, Color(0xFF059669));
+    case 'LIABILITY_HOLD':
+      return const _TxMeta('Jaminan Ditahan', Icons.shield_rounded, Color(0xFFDC2626));
+    case 'LIABILITY_RELEASE':
+      return const _TxMeta('Jaminan Dikembalikan', Icons.verified_user_rounded, Color(0xFF059669));
+    case 'LIABILITY_CONFISCATED':
+      return const _TxMeta('Jaminan Ditarik', Icons.gavel_rounded, Color(0xFFDC2626));
     case 'PLATFORM_FEE':
       return const _TxMeta('Biaya Platform', Icons.percent_rounded, Color(0xFF6B7280));
     case 'REFUND':

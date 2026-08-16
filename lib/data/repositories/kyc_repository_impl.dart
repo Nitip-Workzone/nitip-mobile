@@ -10,16 +10,16 @@ class KycRepositoryImpl implements KycRepository {
 
   @override
   Future<Map<String, dynamic>> submitKyc({
-    required String idCardNumber,
-    required File idCardImage,
+    required String facebookName,
+    required File facebookScreenshot,
     required File selfieImage,
   }) async {
     try {
       final formData = FormData.fromMap({
-        'id_card_number': idCardNumber,
-        'id_card': await MultipartFile.fromFile(
-          idCardImage.path,
-          filename: 'id_card.jpg',
+        'facebook_name': facebookName,
+        'facebook_screenshot': await MultipartFile.fromFile(
+          facebookScreenshot.path,
+          filename: 'facebook_screenshot.jpg',
         ),
         'selfie': await MultipartFile.fromFile(
           selfieImage.path,

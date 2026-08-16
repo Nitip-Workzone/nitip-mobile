@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nitip_flutter_mobile/presentation/widgets/common/safe_webview_widget.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -356,7 +357,8 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
         ),
         body: Stack(
           children: [
-            if (!_hasError && _webViewController != null) WebViewWidget(controller: _webViewController!)
+            if (!_hasError && _webViewController != null)
+              SafeWebViewWidget(controller: _webViewController!)
             else if (_hasError)
               Center(
                 child: Padding(

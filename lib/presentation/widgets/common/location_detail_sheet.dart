@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nitip_flutter_mobile/presentation/widgets/common/safe_webview_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -217,7 +218,7 @@ class _LocationDetailSheetState extends State<LocationDetailSheet> {
             child: Stack(
               children: [
                 if (!_hasWebViewError)
-                  WebViewWidget(
+                  SafeWebViewWidget(
                     controller: _webViewController,
                     gestureRecognizers: {
                       Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),

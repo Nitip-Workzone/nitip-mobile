@@ -34,6 +34,8 @@ class WalletTransactionModel {
   final String status;
   final String? qrisString;
   final Map<String, dynamic>? destinationMetadata;
+  final double pgFee;
+  final int uniqueCode;
   final DateTime createdAt;
 
   WalletTransactionModel({
@@ -46,6 +48,8 @@ class WalletTransactionModel {
     required this.status,
     this.qrisString,
     this.destinationMetadata,
+    required this.pgFee,
+    required this.uniqueCode,
     required this.createdAt,
   });
 
@@ -60,6 +64,8 @@ class WalletTransactionModel {
       status: json['status'],
       qrisString: json['qris_string'],
       destinationMetadata: json['destination_metadata'],
+      pgFee: (json['pg_fee'] as num?)?.toDouble() ?? 0.0,
+      uniqueCode: json['unique_code'] ?? 0,
       createdAt: DateTime.parse(json['created_at']),
     );
   }

@@ -40,15 +40,15 @@ class KycNotifier extends StateNotifier<KycState> {
   KycNotifier(this._repository, this._ref) : super(KycState());
 
   Future<void> submit({
-    required String idCardNumber,
-    required String idCardPath,
+    required String facebookName,
+    required String facebookScreenshotPath,
     required String selfiePath,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _repository.submitKyc(
-        idCardNumber: idCardNumber,
-        idCardImage: File(idCardPath),
+        facebookName: facebookName,
+        facebookScreenshot: File(facebookScreenshotPath),
         selfieImage: File(selfiePath),
       );
       

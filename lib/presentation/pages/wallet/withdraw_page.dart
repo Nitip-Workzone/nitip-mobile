@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
@@ -193,6 +194,34 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
         _isLoading = false;
         _error = e.toString().replaceAll('Exception: ', '');
       });
+      if (mounted && (e.toString().contains('KycRequiredException') || e.toString().contains('KYC_REQUIRED') || e.toString().contains('verifikasi e-KYC'))) {
+        final isRunner = ref.read(authProvider).user?.isRunner ?? false;
+        final primaryColor = isRunner ? AppColors.secondary : AppColors.primary;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Butuh Verifikasi e-KYC'),
+            content: const Text(
+              'Batas harian penarikan dana untuk akun non-verifikasi telah tercapai.\n\n'
+              'Selesaikan verifikasi e-KYC (Facebook & Selfie) sekarang untuk mendapatkan akses tanpa batas!',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/kyc-intro');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                child: const Text('Verifikasi Sekarang'),
+              ),
+            ],
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

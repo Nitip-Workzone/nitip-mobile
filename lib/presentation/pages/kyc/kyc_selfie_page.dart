@@ -10,10 +10,10 @@ const Color _kGreen = AppColors.primary;
 const Color _kGreenLight = AppColors.primaryLight;
 
 class KycSelfiePage extends ConsumerStatefulWidget {
-  final String ktpPath;
-  final String idCardNumber;
+  final String facebookScreenshotPath;
+  final String facebookName;
 
-  const KycSelfiePage({super.key, required this.ktpPath, required this.idCardNumber});
+  const KycSelfiePage({super.key, required this.facebookScreenshotPath, required this.facebookName});
 
   @override
   ConsumerState<KycSelfiePage> createState() => _KycSelfiePageState();
@@ -52,8 +52,8 @@ class _KycSelfiePageState extends ConsumerState<KycSelfiePage> {
     if (_selfiePath == null) return;
 
     await ref.read(kycProvider.notifier).submit(
-          idCardNumber: widget.idCardNumber,
-          idCardPath: widget.ktpPath,
+          facebookName: widget.facebookName,
+          facebookScreenshotPath: widget.facebookScreenshotPath,
           selfiePath: _selfiePath!,
         );
 
@@ -69,7 +69,7 @@ class _KycSelfiePageState extends ConsumerState<KycSelfiePage> {
       } else if (kycState.isSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('KTP & Selfie berhasil disubmit! Menunggu verifikasi.'),
+            content: Text('Verifikasi e-KYC berhasil dikirim! Menunggu verifikasi.'),
             backgroundColor: _kGreen,
           ),
         );
@@ -128,7 +128,7 @@ class _KycSelfiePageState extends ConsumerState<KycSelfiePage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Foto selfie Anda akan digunakan untuk mencocokkan wajah dengan foto KTP.',
+                        'Foto selfie Anda akan digunakan untuk mencocokkan wajah dengan profil Facebook.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.6),
                       ),

@@ -18,8 +18,8 @@ class KycKtpPage extends StatefulWidget {
 }
 
 class _KycKtpPageState extends State<KycKtpPage> {
-  String? _ktpPath;
-  final _nikController = TextEditingController();
+  String? _screenshotPath;
+  final _fbNameController = TextEditingController();
 
   @override
   void initState() {
@@ -32,7 +32,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
   void dispose() {
     ScreenProtector.preventScreenshotOff();
     ScreenProtector.protectDataLeakageOff();
-    _nikController.dispose();
+    _fbNameController.dispose();
     super.dispose();
   }
 
@@ -58,7 +58,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
         imageQuality: 90,
       );
       if (file != null) {
-        setState(() => _ktpPath = file.path);
+        setState(() => _screenshotPath = file.path);
       }
     } else {
       if (mounted) {
@@ -77,15 +77,15 @@ class _KycKtpPageState extends State<KycKtpPage> {
       ),
     );
     if (result != null) {
-      setState(() => _ktpPath = result);
+      setState(() => _screenshotPath = result);
     }
   }
 
   void _onNext() {
-    if (_ktpPath == null) return;
-    if (_nikController.text.length < 16) {
+    if (_screenshotPath == null) return;
+    if (_fbNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon pastikan NIK KTP Anda berjumlah pas 16 digit.')),
+        const SnackBar(content: Text('Nama profil Facebook tidak boleh kosong.')),
       );
       return;
     }
@@ -93,8 +93,8 @@ class _KycKtpPageState extends State<KycKtpPage> {
       context,
       MaterialPageRoute(
         builder: (_) => KycSelfiePage(
-          ktpPath: _ktpPath!,
-          idCardNumber: _nikController.text,
+          facebookScreenshotPath: _screenshotPath!,
+          facebookName: _fbNameController.text.trim(),
         ),
       ),
     );
@@ -128,10 +128,10 @@ class _KycKtpPageState extends State<KycKtpPage> {
                   SizedBox(
                     height: 160,
                     child: Image.asset(
-                      'assets/images/kyc_ktp.png',
+                      'assets/images/kyc_facebook.png',
                       fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Icon(
-                        Icons.credit_card_rounded,
+                        Icons.facebook_rounded,
                         size: 100,
                         color: _kGreen,
                       ),
@@ -140,28 +140,26 @@ class _KycKtpPageState extends State<KycKtpPage> {
 
                   const SizedBox(height: 16),
                   const Text(
-                    'Foto KTP Anda',
+                    'Profil Facebook',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1A1A1A)),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Masukkan NIK dan upload foto KTP asli Anda yang masih berlaku.',
+                    'Masukkan nama profil Facebook Anda dan unggah screenshot profil Anda.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.6),
                   ),
 
                   const SizedBox(height: 28),
 
-                  // NIK Input
+                  // Facebook Name Input
                   TextField(
-                    controller: _nikController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 16,
+                    controller: _fbNameController,
+                    keyboardType: TextInputType.text,
                     decoration: InputDecoration(
-                      labelText: 'Nomor NIK',
-                      hintText: 'Masukkan 16 digit NIK',
-                      prefixIcon: const Icon(Icons.badge_outlined),
-                      counterText: '',
+                      labelText: 'Nama Profil Facebook',
+                      hintText: 'Nama akun profil Facebook Anda',
+                      prefixIcon: const Icon(Icons.facebook_rounded),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -173,11 +171,11 @@ class _KycKtpPageState extends State<KycKtpPage> {
                   const SizedBox(height: 20),
 
                   // Preview if captured
-                  if (_ktpPath != null) ...[
+                  if (_screenshotPath != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(14),
                       child: Image.file(
-                        File(_ktpPath!),
+                        File(_screenshotPath!),
                         width: double.infinity,
                         height: 200,
                         fit: BoxFit.cover,
@@ -185,7 +183,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
                     ),
                     const SizedBox(height: 16),
                     TextButton.icon(
-                      onPressed: () => setState(() => _ktpPath = null),
+                      onPressed: () => setState(() => _screenshotPath = null),
                       icon: const Icon(Icons.refresh_rounded, color: _kGreen),
                       label: const Text('Ambil Ulang', style: TextStyle(color: _kGreen)),
                     ),
@@ -193,16 +191,16 @@ class _KycKtpPageState extends State<KycKtpPage> {
                     // Option: Camera
                     _OptionCard(
                       icon: Icons.camera_alt_outlined,
-                      title: 'Ambil Foto Langsung',
-                      desc: 'Gunakan kamera belakang untuk memfoto KTP',
+                      title: 'Ambil Foto Laysung',
+                      desc: 'Gunakan kamera belakang untuk mengambil foto screen profil',
                       onTap: _pickFromCamera,
                     ),
                     const SizedBox(height: 14),
                     // Option: Gallery / File
                     _OptionCard(
                       icon: Icons.photo_library_outlined,
-                      title: 'Pilih dari Galeri',
-                      desc: 'Upload foto KTP dari galeri perangkat Anda',
+                      title: 'Pilih dari Galeri (Sangat Disarankan)',
+                      desc: 'Upload screenshot profil Facebook dari galeri',
                       onTap: _pickFromGallery,
                     ),
                   ],
@@ -218,11 +216,11 @@ class _KycKtpPageState extends State<KycKtpPage> {
                     ),
                     child: const Column(
                       children: [
-                        _TipRow(icon: Icons.light_mode_outlined, text: 'Pastikan pencahayaan cukup, hindari kilat'),
+                        _TipRow(icon: Icons.lock_open_outlined, text: 'Profil Facebook tidak boleh dikunci/private'),
                         SizedBox(height: 8),
-                        _TipRow(icon: Icons.crop_free_rounded, text: 'Seluruh kartu harus masuk dalam bingkai'),
+                        _TipRow(icon: Icons.face_outlined, text: 'Foto wajah di profil harus mirip dengan selfie Anda'),
                         SizedBox(height: 8),
-                        _TipRow(icon: Icons.text_fields_rounded, text: 'Pastikan teks NIK dan nama terbaca jelas'),
+                        _TipRow(icon: Icons.info_outline, text: 'Akun baru / palsu akan ditolak saat verifikasi'),
                       ],
                     ),
                   ),
@@ -244,7 +242,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _ktpPath != null ? _onNext : null,
+                onPressed: _screenshotPath != null ? _onNext : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kGreen,
                   disabledBackgroundColor: Colors.grey[200],

@@ -50,6 +50,22 @@ class ApiClient {
             e.type == DioExceptionType.sendTimeout) {
           onPoorConnectionChanged?.call(true);
         }
+        
+        // Intercept KYC_REQUIRED error code
+        if (e.response?.data != null && e.response?.data is Map) {
+          final data = e.response!.data as Map;
+          if (data['error_code'] == 'KYC_REQUIRED') {
+            final msg = data['message'] ?? 'Proses ini memerlukan verifikasi e-KYC.';
+            return handler.reject(
+              DioException(
+                requestOptions: e.requestOptions,
+                response: e.response,
+                error: KycRequiredException(msg),
+                type: DioExceptionType.badResponse,
+              ),
+            );
+          }
+        }
         return handler.next(e);
       },
     ));
@@ -231,4 +247,12 @@ class ApiResponse<T> {
       errors: json['errors'],
     );
   }
+}
+
+class KycRequiredException implements Exception {
+  final String message;
+  KycRequiredException(this.message);
+
+  @override
+  String toString() => message;
 }

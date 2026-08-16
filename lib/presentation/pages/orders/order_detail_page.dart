@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:nitip_flutter_mobile/presentation/widgets/common/safe_webview_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -152,7 +153,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
           child: Stack(
             children: [
               if (_previewMapWebViewController != null)
-                WebViewWidget(controller: _previewMapWebViewController!),
+                SafeWebViewWidget(controller: _previewMapWebViewController!),
               if (_isPreviewMapLoading)
                 Positioned.fill(
                   child: Container(
@@ -1058,7 +1059,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     }
 
     // Commission amount to display as motivator
-    final commission = order.deliveryFee;
+    final commission = order.deliveryFee - order.serviceFee - order.checkingFee;
 
     return Container(
       width: double.infinity,
@@ -1725,7 +1726,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
             child: Stack(
               children: [
                 if (_mapWebViewController != null)
-                  WebViewWidget(
+                  SafeWebViewWidget(
                     controller: _mapWebViewController!,
                     gestureRecognizers: {
                       Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
@@ -2196,6 +2197,33 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       // Stay on the detail page; the re-fetched states automatically transition from preview to active task layout!
     } else {
       final error = ref.read(exploreOrdersProvider).error ?? 'Gagal mengambil pesanan';
+      if (error.contains('KycRequiredException') || error.contains('KYC_REQUIRED') || error.contains('verifikasi e-KYC')) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Butuh Verifikasi e-KYC'),
+            content: const Text(
+              'Batas harian menerima pesanan untuk akun non-verifikasi telah tercapai.\n\n'
+              'Selesaikan verifikasi e-KYC (Facebook & Selfie) sekarang untuk mendapatkan akses tanpa batas!',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/kyc-intro');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+                child: const Text('Verifikasi Sekarang'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
       _showSnackBar(error, isError: true);
     }
   }
@@ -2490,6 +2518,19 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   Widget _buildQRISPaymentSection(OrderModel order, Color primary) {
     if (order.qrisData == null || order.qrisData!.isEmpty) return const SizedBox.shrink();
 
+    final qrisStr = order.qrisData!;
+    final String qrisUrl;
+    if (qrisStr.startsWith('000201')) {
+      qrisUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${Uri.encodeComponent(qrisStr)}';
+    } else {
+      qrisUrl = qrisStr;
+    }
+
+    final isSandbox = qrisStr.contains('sandbox') ||
+        qrisStr.contains('mock') ||
+        qrisStr.contains('localhost') ||
+        qrisStr.startsWith('000201');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2504,23 +2545,146 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
-              const SizedBox(height: 20),
-              CachedNetworkImage(
-                imageUrl: order.qrisData!,
-                width: 200,
-                height: 200,
-                placeholder: (context, url) => const SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 16),
+              
+              // Official QRIS Sheet Card
+              Container(
+                width: 250,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade200, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                errorWidget: (context, url, error) => const SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: Center(child: Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey)),
+                child: Column(
+                  children: [
+                    // Header: QRIS & GPN Logo
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Stylized QRIS text
+                        Row(
+                          children: [
+                            Text(
+                              'QR',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF0F265C),
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                            Text(
+                              'IS',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFFDF2524),
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Red GPN Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDF2524),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'GPN',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Divider(color: Colors.grey.shade100, height: 1, thickness: 1),
+                    const SizedBox(height: 8),
+
+                    // Merchant Info
+                    Text(
+                      order.pickupName ?? 'KEDAI KRIMMI',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textMain,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'NMID: ID1026556507279',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Colors.grey,
+                        fontFamily: 'Courier',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // QR Image Frame
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade100, width: 1),
+                      ),
+                      child: CachedNetworkImage(
+                        imageUrl: qrisUrl,
+                        width: 160,
+                        height: 160,
+                        placeholder: (context, url) => const SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (context, url, error) => const SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: Center(child: Icon(Icons.broken_image_rounded, size: 30, color: Colors.grey)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Supported Bank/Ewallet logos at bottom
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Image.asset('assets/images/providers/gopay.png', height: 10, fit: BoxFit.contain),
+                        Image.asset('assets/images/providers/shopeepay.png', height: 10, fit: BoxFit.contain),
+                        Image.asset('assets/images/providers/ovo.png', height: 10, fit: BoxFit.contain),
+                        Image.asset('assets/images/providers/dana.png', height: 10, fit: BoxFit.contain),
+                        Image.asset('assets/images/providers/mandiri.png', height: 10, fit: BoxFit.contain),
+                        Image.asset('assets/images/providers/bca.png', height: 10, fit: BoxFit.contain),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               const Text(
                 'Status: Menunggu Pembayaran',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.warning),
@@ -2540,6 +2704,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
 
   Widget _buildPaymentDetails(OrderModel order, Color primary, bool isRunner) {
+    final baseJastip = order.deliveryFee - order.serviceFee - order.checkingFee;
     return _buildCard(
       child: Column(
         children: [
@@ -2547,10 +2712,18 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
             _buildSummaryRow('Harga Barang', CurrencyFormatter.formatToIdr(order.estimatedCost, withSymbol: true)),
             const SizedBox(height: 8),
           ],
-          _buildSummaryRow(isRunner ? 'Komisi Anda' : 'Biaya Titip', CurrencyFormatter.formatToIdr(order.deliveryFee, withSymbol: true)),
+          if (isRunner) ...[
+            _buildSummaryRow('Komisi Bersih Anda', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
+          ] else ...[
+            _buildSummaryRow('Biaya Titip / Ongkos Kirim', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
+            const SizedBox(height: 8),
+            _buildSummaryRow('Biaya Layanan', CurrencyFormatter.formatToIdr(order.serviceFee, withSymbol: true)),
+            const SizedBox(height: 8),
+            _buildSummaryRow('Biaya Pengecekan', CurrencyFormatter.formatToIdr(order.checkingFee, withSymbol: true)),
+          ],
           const Divider(height: 24),
           _buildSummaryRow(
-            isRunner ? 'Total Pendapatan' : 'Total Pembayaran', 
+            isRunner ? 'Total Pendapatan/Reimbursement' : 'Total Pembayaran', 
             CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true), 
             isBold: true, 
             color: primary

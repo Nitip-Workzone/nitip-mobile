@@ -377,27 +377,69 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
             ],
 
             // ── Amount besar ──────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
+            if (tx.type == 'TOP_UP') ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Nominal Top Up', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                        Text(_currencyFmt.format(tx.amount.abs()), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Biaya Layanan QRIS', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                        Text(_currencyFmt.format(tx.pgFee), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Pembayaran', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        Text(
+                          _currencyFmt.format(tx.amount.abs() + tx.pgFee),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  Text(tx.type == 'WITHDRAWAL' ? 'Nominal Penarikan' : 'Nominal Top Up',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                  const SizedBox(height: 6),
-                  Text(
-                    _currencyFmt.format(tx.amount),
-                    style: const TextStyle(
-                        fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                  ),
-                ],
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    Text(tx.type == 'WITHDRAWAL' ? 'Nominal Penarikan' : 'Nominal Transaksi',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    const SizedBox(height: 6),
+                    Text(
+                      _currencyFmt.format(tx.amount.abs()),
+                      style: const TextStyle(
+                          fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
 
             const SizedBox(height: 16),
 
@@ -464,6 +506,9 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
       case 'WITHDRAWAL': return 'Penarikan';
       case 'ESCROW_HOLD': return 'Escrow Tahan';
       case 'ESCROW_RELEASE': return 'Escrow Lepas';
+      case 'LIABILITY_HOLD': return 'Jaminan Ditahan';
+      case 'LIABILITY_RELEASE': return 'Jaminan Dikembalikan';
+      case 'LIABILITY_CONFISCATED': return 'Jaminan Ditarik';
       case 'REFUND': return 'Pengembalian Dana';
       default: return type;
     }

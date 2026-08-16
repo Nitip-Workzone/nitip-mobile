@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:nitip_flutter_mobile/presentation/widgets/common/safe_webview_widget.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -252,7 +253,7 @@ class _TripsTabState extends ConsumerState<TripsTab> {
                   if (_hasMapError)
                     _buildMapFallback(trip, primary)
                   else if (_webViewController != null) ...[
-                    WebViewWidget(
+                    SafeWebViewWidget(
                       controller: _webViewController!,
                       gestureRecognizers: {
                         Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),

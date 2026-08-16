@@ -515,6 +515,12 @@ _TileMeta _tileMeta(String type) {
       return const _TileMeta('Dana Tahan (Escrow)', Icons.lock_rounded, Color(0xFFF59E0B));
     case 'ESCROW_RELEASE':
       return const _TileMeta('Dana Cair (Escrow)', Icons.lock_open_rounded, Color(0xFF059669));
+    case 'LIABILITY_HOLD':
+      return const _TileMeta('Jaminan Ditahan', Icons.shield_rounded, Color(0xFFDC2626));
+    case 'LIABILITY_RELEASE':
+      return const _TileMeta('Jaminan Dikembalikan', Icons.verified_user_rounded, Color(0xFF059669));
+    case 'LIABILITY_CONFISCATED':
+      return const _TileMeta('Jaminan Ditarik', Icons.gavel_rounded, Color(0xFFDC2626));
     case 'PLATFORM_FEE':
       return const _TileMeta('Biaya Platform', Icons.percent_rounded, Color(0xFF6B7280));
     case 'REFUND':
