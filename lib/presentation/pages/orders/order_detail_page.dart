@@ -2668,17 +2668,17 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
                     // Supported Bank/Ewallet logos at bottom
                     Wrap(
-                      spacing: 5,
+                      spacing: 6,
                       runSpacing: 4,
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Image.asset('assets/images/providers/gopay.png', height: 10, fit: BoxFit.contain),
-                        Image.asset('assets/images/providers/shopeepay.png', height: 10, fit: BoxFit.contain),
-                        Image.asset('assets/images/providers/ovo.png', height: 10, fit: BoxFit.contain),
-                        Image.asset('assets/images/providers/dana.png', height: 10, fit: BoxFit.contain),
-                        Image.asset('assets/images/providers/mandiri.png', height: 10, fit: BoxFit.contain),
-                        Image.asset('assets/images/providers/bca.png', height: 10, fit: BoxFit.contain),
+                        _buildSmallBrandBadge('GoPay', const Color(0xFF00AED6)),
+                        _buildSmallBrandBadge('SPay', const Color(0xFFEE4D2D)),
+                        _buildSmallBrandBadge('OVO', const Color(0xFF4C3497)),
+                        _buildSmallBrandBadge('DANA', const Color(0xFF118EEA)),
+                        _buildSmallBrandBadge('Mandiri', const Color(0xFF003A6E)),
+                        _buildSmallBrandBadge('BCA', const Color(0xFF0060AF)),
                       ],
                     ),
                   ],
@@ -2732,6 +2732,18 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
           _buildPaymentMethodTag(order.paymentMethod, primary, isRunner),
         ],
       ),
+    );
+  }
+
+  Widget _buildSmallBrandBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.8),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: color)),
     );
   }
 

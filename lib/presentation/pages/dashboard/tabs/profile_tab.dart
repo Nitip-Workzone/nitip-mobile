@@ -185,17 +185,86 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // KYC status chip
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isVerified ? Colors.green.withValues(alpha: 0.9) : Colors.orange.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          isVerified ? 'Terverifikasi' : 'Belum Verifikasi',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
+                      // KYC status chip - warna & wording berubah jika sudah submit/pending (sesuai request)
+                      Builder(
+                        builder: (context) {
+                          final authState = ref.watch(authProvider);
+                          final kycStatus = authState.kycStatus ?? 'none';
+                          Color bgColor;
+                          String label;
+                          if (isVerified || kycStatus == 'approved') {
+                            bgColor = Colors.green.withValues(alpha: 0.9);
+                            label = 'Terverifikasi ✓';
+                          } else if (kycStatus == 'pending') {
+                            bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.95);
+                            label = 'Sudah Submit - Menunggu Admin (1x24 jam)';
+                          } else if (kycStatus == 'rejected') {
+                            bgColor = const Color(0xFFEF4444).withValues(alpha: 0.9);
+                            label = 'Ditolak - Ajukan Ulang';
+                          } else {
+                            bgColor = Colors.grey.withValues(alpha: 0.9);
+                            label = 'Belum Verifikasi';
+                          }
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(16),
+                              border: kycStatus == 'pending' ? Border.all(color: Colors.white, width: 1.5) : null,
+                              boxShadow: kycStatus == 'pending' ? [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)] : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (kycStatus == 'pending')
+                                  Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 2)])),
+                                Text(
+                                  label,
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      // Detail banner pending/rejected (di bawah chip)
+                      Builder(
+                        builder: (context) {
+                          final authState = ref.watch(authProvider);
+                          final kycStatus = authState.kycStatus ?? 'none';
+                          if (kycStatus == 'pending') {
+                            return Container(
+                              margin: const EdgeInsets.only(top: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                              ),
+                              child: const Text(
+                                '⏳ Sudah Submit: Dokumen selfie kamera langsung + Facebook sedang ditinjau admin (1x24 jam). Badge kuning akan jadi hijau setelah disetujui.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500, height: 1.3),
+                              ),
+                            );
+                          } else if (kycStatus == 'rejected') {
+                            return Container(
+                              margin: const EdgeInsets.only(top: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              ),
+                              child: const Text(
+                                '❌ Ditolak: Perbaiki foto selfie wajib kamera langsung yang jelas & Facebook tidak private, lalu ajukan ulang.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, height: 1.3),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
                       ),
                       const SizedBox(height: 14),
                       if (userLocation != null) ...[
@@ -476,30 +545,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                               right: 0,
                               child: GestureDetector(
                                 onTap: () async {
-                                  final source = await showModalBottomSheet<ImageSource>(
-                                    context: context,
-                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-                                    builder: (ctx) => SafeArea(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          ListTile(
-                                            leading: const Icon(Icons.photo_library_rounded),
-                                            title: const Text('Pilih dari Galeri'),
-                                            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                                          ),
-                                          ListTile(
-                                            leading: const Icon(Icons.camera_alt_rounded),
-                                            title: const Text('Ambil Foto'),
-                                            onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                  if (source == null) return;
+                                  // WAJIB KAMERA LANGSUNG untuk foto profil/selfie - tidak boleh file/gallery (keamanan eKYC)
                                   final picker = ImagePicker();
-                                  final pickedFile = await picker.pickImage(source: source, imageQuality: 80, maxWidth: 1024, maxHeight: 1024);
+                                  final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 80, maxWidth: 1024, maxHeight: 1024, preferredCameraDevice: CameraDevice.front);
                                   if (pickedFile != null) {
                                     sheetSetState(() {
                                       localAvatarPath = pickedFile.path;

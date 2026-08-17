@@ -37,16 +37,35 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
 
   final _presets = [50000, 100000, 200000, 500000, 1000000];
 
-  final Map<String, String> _brandLogos = {
-    'BCA': 'assets/images/providers/bca.png',
-    'MANDIRI': 'assets/images/providers/mandiri.png',
-    'BNI': 'assets/images/providers/bni.png',
-    'BRI': 'assets/images/providers/bri.png',
-    'GOPAY': 'assets/images/providers/gopay.png',
-    'OVO': 'assets/images/providers/ovo.png',
-    'DANA': 'assets/images/providers/dana.png',
-    'SHOPEEPAY': 'assets/images/providers/shopeepay.png',
+  // Official brand colors - replaces AI-generated PNGs with official guideline colors
+  // Source: Official brand guidelines BCA #0060AF, Mandiri #003A6E + #FED700, BNI #F15A23, BRI #00529C, DANA #118EEA, GoPay #00AED6, OVO #4C3497, ShopeePay #EE4D2D
+  final Map<String, Map<String, dynamic>> _brandInfo = {
+    'BCA': {'short': 'BCA', 'bg': const Color(0xFFE6F0FA), 'text': const Color(0xFF0060AF), 'border': const Color(0xFF0060AF)},
+    'MANDIRI': {'short': 'Mandiri', 'bg': const Color(0xFFE6EEF5), 'text': const Color(0xFF003A6E), 'border': const Color(0xFF003A6E)},
+    'BNI': {'short': 'BNI', 'bg': const Color(0xFFFFF0EB), 'text': const Color(0xFF0066B2), 'border': const Color(0xFFF15A23)},
+    'BRI': {'short': 'BRI', 'bg': const Color(0xFFE6EEF7), 'text': const Color(0xFF00529C), 'border': const Color(0xFF00529C)},
+    'GOPAY': {'short': 'GoPay', 'bg': const Color(0xFFE6F7FC), 'text': const Color(0xFF00AED6), 'border': const Color(0xFF00AED6)},
+    'OVO': {'short': 'OVO', 'bg': const Color(0xFFF0EBFA), 'text': const Color(0xFF4C3497), 'border': const Color(0xFF4C3497)},
+    'DANA': {'short': 'DANA', 'bg': const Color(0xFFE7F4FD), 'text': const Color(0xFF118EEA), 'border': const Color(0xFF118EEA)},
+    'SHOPEEPAY': {'short': 'SPay', 'bg': const Color(0xFFFEECE8), 'text': const Color(0xFFEE4D2D), 'border': const Color(0xFFEE4D2D)},
   };
+
+  Widget _buildBrandBadge(String code, {double size = 36}) {
+    final info = _brandInfo[code.toUpperCase()];
+    if (info == null) {
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade200)),
+        child: const Icon(Icons.account_balance_rounded, size: 18, color: Colors.grey),
+      );
+    }
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(color: info['bg'] as Color, borderRadius: BorderRadius.circular(10), border: Border.all(color: info['border'] as Color, width: 1.2)),
+      alignment: Alignment.center,
+      child: Text(info['short'] as String, style: TextStyle(fontSize: size * 0.28, fontWeight: FontWeight.w900, color: info['text'] as Color)),
+    );
+  }
 
   @override
   void initState() {
@@ -835,7 +854,7 @@ class _WithdrawPageState extends ConsumerState<WithdrawPage> {
                       accountName: bankAccount.accountName,
                       accountNo: bankAccount.accountNo,
                       bankName: bankAccount.bankName,
-                      logoPath: _brandLogos[bankAccount.bankName.toUpperCase()],
+                      brandBadge: _buildBrandBadge(bankAccount.bankName, size: 48),
                     ),
                   ],
 

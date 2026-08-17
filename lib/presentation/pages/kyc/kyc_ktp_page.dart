@@ -191,7 +191,7 @@ class _KycKtpPageState extends State<KycKtpPage> {
                     // Option: Camera
                     _OptionCard(
                       icon: Icons.camera_alt_outlined,
-                      title: 'Ambil Foto Laysung',
+                      title: 'Ambil Foto Langsung',
                       desc: 'Gunakan kamera belakang untuk mengambil foto screen profil',
                       onTap: _pickFromCamera,
                     ),

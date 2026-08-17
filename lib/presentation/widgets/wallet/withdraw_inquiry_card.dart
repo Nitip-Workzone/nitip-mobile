@@ -5,6 +5,7 @@ class WithdrawInquiryCard extends StatelessWidget {
   final String accountNo;
   final String bankName;
   final String? logoPath;
+  final Widget? brandBadge;
 
   const WithdrawInquiryCard({
     super.key,
@@ -12,6 +13,7 @@ class WithdrawInquiryCard extends StatelessWidget {
     required this.accountNo,
     required this.bankName,
     this.logoPath,
+    this.brandBadge,
   });
 
   @override
@@ -59,7 +61,9 @@ class WithdrawInquiryCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (logoPath != null)
+              if (brandBadge != null)
+                brandBadge!
+              else if (logoPath != null)
                 Image.asset(logoPath!, height: 24, errorBuilder: (_, __, ___) => const SizedBox())
               else
                 const Icon(Icons.account_balance_rounded, color: Color(0xFF64748B), size: 24),

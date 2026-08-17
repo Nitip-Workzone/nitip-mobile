@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/dashboard_provider.dart';
@@ -24,7 +25,7 @@ class HomeTab extends ConsumerWidget {
     
     final user = authState.user;
     final isLoading = user == null;
-    final userName = user?.name ?? 'Runner';
+    final userName = user?.name != null ? user!.name.trim().split(' ').first : 'Runner';
     final isVerified = user?.isVerified ?? false;
     final notifState = ref.watch(notificationProvider);
     final activeOrdersCount = activityState.activeOrders.length;
@@ -204,7 +205,26 @@ class HomeTab extends ConsumerWidget {
                                     ref.read(walletProvider.notifier).fetchBalance(force: true);
                                   },
                                 ),
-
+                                if (!isVerified && AppConfig.isKycRequired) ...[
+                                  const SizedBox(height: 16),
+                                  Consumer(
+                                    builder: (context, ref, _) {
+                                      final authState = ref.watch(authProvider);
+                                      final kycStatus = authState.kycStatus ?? 'none';
+                                      return _KycWarningBanner(
+                                        primaryColor: primary,
+                                        kycStatus: kycStatus,
+                                        onTap: () {
+                                          if (kycStatus == 'pending') {
+                                            context.push('/kyc-status');
+                                          } else {
+                                            context.push('/kyc-intro');
+                                          }
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
                                 const SizedBox(height: 32),
 
                                 // ── Quick Actions ────────────────────────
@@ -891,6 +911,149 @@ class _BlinkingLocationLoadingState extends State<_BlinkingLocationLoading> with
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _KycWarningBanner extends StatelessWidget {
+  final Color primaryColor;
+  final String kycStatus;
+  final VoidCallback onTap;
+
+  const _KycWarningBanner({
+    required this.primaryColor,
+    this.kycStatus = 'none',
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = kycStatus == 'pending';
+    final isRejected = kycStatus == 'rejected';
+    final bgColor = isPending
+        ? const Color(0xFFFFF8E1)
+        : isRejected
+            ? const Color(0xFFFEE2E2)
+            : Colors.orange.shade50;
+    final borderColor = isPending
+        ? const Color(0xFFF59E0B)
+        : isRejected
+            ? const Color(0xFFF87171)
+            : Colors.orange.shade200;
+    final iconBg = isPending
+        ? const Color(0xFFFEF3C7)
+        : isRejected
+            ? const Color(0xFFFECACA)
+            : Colors.orange.shade100;
+    final iconColor = isPending
+        ? const Color(0xFFD97706)
+        : isRejected
+            ? const Color(0xFFDC2626)
+            : Colors.orange.shade800;
+
+    final title = isPending
+        ? 'Verifikasi Sedang Diproses'
+        : isRejected
+            ? 'Verifikasi Ditolak'
+            : 'Verifikasi e-KYC Diperlukan';
+    final desc = isPending
+        ? 'Data Anda sedang ditinjau. Estimasi proses verifikasi 1x24 jam.'
+        : isRejected
+            ? 'Ajukan ulang dengan dokumen/foto selfie yang lebih jelas.'
+            : 'Lengkapi verifikasi profil untuk transaksi tanpa batas.';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgColor,
+          border: Border.all(color: borderColor, width: isPending ? 2 : 1),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                isPending
+                    ? Icons.hourglass_top_rounded
+                    : isRejected
+                        ? Icons.error_outline_rounded
+                        : Icons.warning_amber_rounded,
+                color: iconColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (isPending)
+                        Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 6), decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle)),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isPending
+                                ? const Color(0xFF92400E)
+                                : isRejected
+                                    ? const Color(0xFF991B1B)
+                                    : Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    desc,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isPending
+                          ? const Color(0xFF92400E)
+                          : isRejected
+                              ? const Color(0xFF991B1B)
+                              : Colors.orange.shade800,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (isPending) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Badge kuning berarti sudah submit, tunggu admin verifikasi (1x24 jam)',
+                      style: TextStyle(fontSize: 9, color: Color(0xFF92400E), fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.orange.shade400,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }
