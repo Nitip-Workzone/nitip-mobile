@@ -14,6 +14,7 @@ import 'presentation/pages/auth/login_page.dart';
 import 'presentation/pages/auth/register_page.dart';
 import 'presentation/pages/dashboard/dashboard_page.dart';
 import 'presentation/pages/kyc/kyc_intro_page.dart';
+import 'presentation/pages/kyc/kyc_status_page.dart';
 import 'presentation/pages/kyc/kyc_verified_benefits_page.dart';
 import 'presentation/pages/notification/notification_page.dart';
 import 'presentation/pages/info/faq_page.dart';
@@ -107,6 +108,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/kyc-intro',
         builder: (context, state) => const KycIntroPage(),
+      ),
+      GoRoute(
+        path: '/kyc-status',
+        builder: (context, state) => const KycStatusPage(),
       ),
       GoRoute(
       path: '/kyc-benefits',

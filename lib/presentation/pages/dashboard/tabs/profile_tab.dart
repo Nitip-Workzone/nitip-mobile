@@ -185,7 +185,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // KYC status chip - warna & wording berubah jika sudah submit/pending (sesuai request)
+                      // KYC status chip - simple wording & warna beda: pending biru, bukan kuning panjang
                       Builder(
                         builder: (context) {
                           final authState = ref.watch(authProvider);
@@ -196,11 +196,11 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                             bgColor = Colors.green.withValues(alpha: 0.9);
                             label = 'Terverifikasi ✓';
                           } else if (kycStatus == 'pending') {
-                            bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.95);
-                            label = 'Sudah Submit - Menunggu Admin (1x24 jam)';
+                            bgColor = const Color(0xFF3B82F6).withValues(alpha: 0.95); // biru beda, bukan amber
+                            label = 'Menunggu Verifikasi';
                           } else if (kycStatus == 'rejected') {
                             bgColor = const Color(0xFFEF4444).withValues(alpha: 0.9);
-                            label = 'Ditolak - Ajukan Ulang';
+                            label = 'Ditolak';
                           } else {
                             bgColor = Colors.grey.withValues(alpha: 0.9);
                             label = 'Belum Verifikasi';
@@ -210,54 +210,46 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                             decoration: BoxDecoration(
                               color: bgColor,
                               borderRadius: BorderRadius.circular(16),
-                              border: kycStatus == 'pending' ? Border.all(color: Colors.white, width: 1.5) : null,
-                              boxShadow: kycStatus == 'pending' ? [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)] : null,
+                              border: kycStatus == 'pending' ? Border.all(color: Colors.white, width: 1.2) : null,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (kycStatus == 'pending')
-                                  Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 2)])),
-                                Text(
-                                  label,
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              ],
+                            child: Text(
+                              label,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           );
                         },
                       ),
-                      // Detail banner pending/rejected (di bawah chip)
+                      // Detail banner pending/rejected simple
                       Builder(
                         builder: (context) {
                           final authState = ref.watch(authProvider);
                           final kycStatus = authState.kycStatus ?? 'none';
                           if (kycStatus == 'pending') {
                             return Container(
-                              margin: const EdgeInsets.only(top: 10),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                               ),
                               child: const Text(
-                                '⏳ Sudah Submit: Dokumen selfie kamera langsung + Facebook sedang ditinjau admin (1x24 jam). Badge kuning akan jadi hijau setelah disetujui.',
+                                'Sedang ditinjau admin',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500, height: 1.3),
+                                style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                               ),
                             );
                           } else if (kycStatus == 'rejected') {
                             return Container(
-                              margin: const EdgeInsets.only(top: 10),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                               ),
                               child: const Text(
-                                '❌ Ditolak: Perbaiki foto selfie wajib kamera langsung yang jelas & Facebook tidak private, lalu ajukan ulang.',
+                                'Ajukan ulang',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, height: 1.3),
                               ),

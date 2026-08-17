@@ -931,37 +931,39 @@ class _KycWarningBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPending = kycStatus == 'pending';
     final isRejected = kycStatus == 'rejected';
+    // Warna harus beda - pending biru simple, bukan kuning/oranye lama
     final bgColor = isPending
-        ? const Color(0xFFFFF8E1)
+        ? const Color(0xFFDBEAFE) // biru beda
         : isRejected
             ? const Color(0xFFFEE2E2)
             : Colors.orange.shade50;
     final borderColor = isPending
-        ? const Color(0xFFF59E0B)
+        ? const Color(0xFF60A5FA) // biru
         : isRejected
             ? const Color(0xFFF87171)
             : Colors.orange.shade200;
     final iconBg = isPending
-        ? const Color(0xFFFEF3C7)
+        ? const Color(0xFFBFDBFE) // biru
         : isRejected
             ? const Color(0xFFFECACA)
             : Colors.orange.shade100;
     final iconColor = isPending
-        ? const Color(0xFFD97706)
+        ? const Color(0xFF1D4ED8) // biru tua
         : isRejected
             ? const Color(0xFFDC2626)
             : Colors.orange.shade800;
 
+    // Wording simple saja
     final title = isPending
-        ? 'Verifikasi Sedang Diproses'
+        ? 'Menunggu Verifikasi'
         : isRejected
             ? 'Verifikasi Ditolak'
             : 'Verifikasi e-KYC Diperlukan';
     final desc = isPending
-        ? 'Data Anda sedang ditinjau. Estimasi proses verifikasi 1x24 jam.'
+        ? 'Sedang ditinjau admin'
         : isRejected
-            ? 'Ajukan ulang dengan dokumen/foto selfie yang lebih jelas.'
-            : 'Lengkapi verifikasi profil untuk transaksi tanpa batas.';
+            ? 'Ajukan ulang'
+            : 'Lengkapi verifikasi';
 
     return GestureDetector(
       onTap: onTap,
@@ -1003,53 +1005,38 @@ class _KycWarningBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      if (isPending)
-                        Container(width: 6, height: 6, margin: const EdgeInsets.only(right: 6), decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle)),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: isPending
-                                ? const Color(0xFF92400E)
-                                : isRejected
-                                    ? const Color(0xFF991B1B)
-                                    : Colors.orange.shade900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isPending
+                          ? const Color(0xFF1E40AF)
+                          : isRejected
+                              ? const Color(0xFF991B1B)
+                              : Colors.orange.shade900,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     desc,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       color: isPending
-                          ? const Color(0xFF92400E)
+                          ? const Color(0xFF1D4ED8)
                           : isRejected
                               ? const Color(0xFF991B1B)
                               : Colors.orange.shade800,
-                      height: 1.3,
+                      height: 1.2,
                     ),
                   ),
-                  if (isPending) ...[
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Badge kuning berarti sudah submit, tunggu admin verifikasi (1x24 jam)',
-                      style: TextStyle(fontSize: 9, color: Color(0xFF92400E), fontStyle: FontStyle.italic),
-                    ),
-                  ],
                 ],
               ),
             ),
             const SizedBox(width: 8),
             Icon(
               Icons.chevron_right_rounded,
-              color: Colors.orange.shade400,
+              color: isPending ? const Color(0xFF60A5FA) : Colors.orange.shade400,
               size: 22,
             ),
           ],
