@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/config/app_config.dart';
@@ -108,6 +110,8 @@ class CreateOrderState {
 class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   final OrderRepository _orderRepo;
   final Ref _ref;
+  CancelToken? _estimateCancelToken;
+  Timer? _estimateDebounce;
 
   CreateOrderNotifier(this._orderRepo, this._ref) : super(CreateOrderState()) {
     // Dengarkan perubahan pada walletProvider untuk sinkronisasi saldo secara real-time
@@ -116,6 +120,13 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
         state = state.copyWith(userBalance: next.wallet!.balance);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _estimateDebounce?.cancel();
+    _estimateCancelToken?.cancel('dispose');
+    super.dispose();
   }
 
   void updateItemDetails(String value) => state = state.copyWith(itemDetails: value);
@@ -181,24 +192,32 @@ class CreateOrderNotifier extends StateNotifier<CreateOrderState> {
   Future<void> estimateFee() async {
     if (!state.canEstimate) return;
     
-    try {
-      final payload = {
-        'pickup_lat': state.pickupLocation!.latitude,
-        'pickup_lng': state.pickupLocation!.longitude,
-        'delivery_lat': state.deliveryLocation!.latitude,
-        'delivery_lng': state.deliveryLocation!.longitude,
-        'weight_kg': state.weightKg,
-        'volume_liters': state.volumeLiters,
-      };
+    _estimateDebounce?.cancel();
+    _estimateDebounce = Timer(const Duration(milliseconds: 300), () async {
+      _estimateCancelToken?.cancel('new_estimate');
+      _estimateCancelToken = CancelToken();
 
-      final result = await _orderRepo.estimateFee(payload);
-      state = state.copyWith(
-        estimatedFee: (result['estimated_fee'] ?? 0).toDouble(),
-        distanceKm: (result['distance_km'] ?? 0).toDouble(),
-      );
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+      try {
+        final payload = {
+          'pickup_lat': state.pickupLocation!.latitude,
+          'pickup_lng': state.pickupLocation!.longitude,
+          'delivery_lat': state.deliveryLocation!.latitude,
+          'delivery_lng': state.deliveryLocation!.longitude,
+          'weight_kg': state.weightKg,
+          'volume_liters': state.volumeLiters,
+        };
+
+        final result = await _orderRepo.estimateFee(payload, cancelToken: _estimateCancelToken);
+        if (_estimateCancelToken?.isCancelled == true) return;
+        state = state.copyWith(
+          estimatedFee: (result['estimated_fee'] ?? 0).toDouble(),
+          distanceKm: (result['distance_km'] ?? 0).toDouble(),
+        );
+      } catch (e) {
+        if (CancelToken.isCancel(e as DioException)) return;
+        state = state.copyWith(error: e.toString());
+      }
+    });
   }
 
   Future<String?> submitOrder() async {

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/services/location_service.dart';
 import 'auth_provider.dart';
 import 'activity_provider.dart';
@@ -20,7 +21,7 @@ final userLocationProvider = StateNotifierProvider<UserLocationNotifier, LatLng?
 /// 3. Sedang trip & app foreground (AppLifecycleState.resumed)
 class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObserver {
   final Ref _ref;
-  Timer? _timer;
+  StreamSubscription<Position>? _positionSub;
   final locationService = LocationService();
   bool _isForeground = true;
   LatLng? _lastSentPos;
@@ -91,22 +92,64 @@ class UserLocationNotifier extends StateNotifier<LatLng?> with WidgetsBindingObs
   }
 
   void startTracking() {
-    if (_timer != null && _timer!.isActive) return;
-    // Heartbeat interval 45s (sebelumnya 15s terlalu sering) — prod 512M + 192M redis safe
-    _timer = Timer.periodic(const Duration(seconds: 45), (timer) async {
+    if (_positionSub != null) return;
+    // Heartbeat event-driven: only trigger when moving >= 20m
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 20,
+    );
+
+    _positionSub = Geolocator.getPositionStream(locationSettings: locationSettings)
+        .listen((Position pos) async {
       if (!_shouldHeartbeat) {
         stopTracking();
         return;
       }
-      await _sendHeartbeat();
+      await _sendHeartbeatWithPosition(pos);
+    }, onError: (err) {
+      debugPrint('[LOCATION] Stream error: $err');
     });
     // Kirim segera pertama kali saat mulai
     Future.microtask(() => _sendHeartbeat());
   }
 
   void stopTracking() {
-    _timer?.cancel();
-    _timer = null;
+    _positionSub?.cancel();
+    _positionSub = null;
+  }
+
+  Future<void> _sendHeartbeatWithPosition(Position posObj) async {
+    try {
+      final pos = LatLng(posObj.latitude, posObj.longitude);
+
+      // Distance dedup: skip if moved <20m (aligned with backend 20m)
+      if (_lastSentPos != null) {
+        const distance = Distance();
+        final moved = distance.as(LengthUnit.Meter, _lastSentPos!, pos);
+        if (moved < 20) return;
+      }
+
+      state = pos;
+
+      final auth = _ref.read(authProvider);
+      if (!auth.isAuthenticated || auth.user == null) return;
+
+      final activity = _ref.read(activityProvider);
+      final activeTripId = _ref.read(currentTripIdProvider);
+      final activeOrdersCount = activity.activeOrders.length;
+
+      await _ref.read(authRepositoryProvider).sendHeartbeat(
+            lat: pos.latitude,
+            lng: pos.longitude,
+            tripId: activeTripId,
+            activeOrders: activeOrdersCount,
+            isForeground: _isForeground,
+          );
+
+      _lastSentPos = pos;
+    } catch (_) {
+      // Silent fail
+    }
   }
 
   Future<void> _sendHeartbeat() async {

@@ -140,8 +140,12 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data) async {
-    final response = await _apiClient.dio.post('/orders/estimate-fee', data: data);
+  Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data, {CancelToken? cancelToken}) async {
+    final response = await _apiClient.dio.post(
+      '/orders/estimate-fee',
+      data: data,
+      cancelToken: cancelToken,
+    );
     final apiResponse = ApiResponse.fromJson(response.data, (data) => data as Map<String, dynamic>);
     if (apiResponse.data == null) throw Exception(apiResponse.message);
     return apiResponse.data!;

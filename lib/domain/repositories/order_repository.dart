@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../models/order_model.dart';
 
 abstract class OrderRepository {
@@ -13,7 +14,7 @@ abstract class OrderRepository {
   Future<void> approveAdjustment(String id);
   Future<void> pickupOrder(String id);
   Future<void> completeOrder(String id, String completionCode, String deliveryImagePath);
-  Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data, {CancelToken? cancelToken});
   Future<List<OrderModel>> getMerchantOrders();
   Future<void> merchantAcceptOrder(String id);
   Future<void> merchantReadyOrder(String id);

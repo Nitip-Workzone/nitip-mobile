@@ -134,6 +134,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   }
 
   Widget _buildPreviewRouteMap(OrderModel order, Color primary) {
+    if (order.pickupLat == 0 && order.pickupLng == 0) {
+      return const SizedBox.shrink();
+    }
     if (_previewMapWebViewController == null) {
       _initPreviewMapWebView(order);
     }
@@ -2706,32 +2709,63 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
 
   Widget _buildPaymentDetails(OrderModel order, Color primary, bool isRunner) {
-    final baseJastip = order.deliveryFee - order.serviceFee - order.checkingFee;
+    // Ongkir full untuk requester (10k), bukan bersih runner 6.250 — request bilang pengecekan awal 10rb
+    // Food: hanya ongkir full, tidak ada pengecekan
+    final baseJastip = order.deliveryFee; // full untuk requester
+    final runnerOngkir = order.deliveryFee - order.serviceFee - order.checkingFee; // bersih runner
+    final bool isFood = (order.merchantId != null && order.merchantId!.isNotEmpty) || order.itemDetails.toLowerCase().contains('nitip food');
     return _buildCard(
       child: Column(
         children: [
-          if (order.serviceCategory == 'beli') ...[
-            _buildSummaryRow('Harga Barang', CurrencyFormatter.formatToIdr(order.estimatedCost, withSymbol: true)),
-            const SizedBox(height: 8),
-          ],
-          if (isRunner) ...[
-            _buildSummaryRow('Komisi Bersih Anda', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
+          // Untuk nitip-food: requester hanya lihat ongkir full 10k, runner hanya ongkir bersih diterima, tidak total + biaya makanan
+          if (isFood) ...[
+            if (isRunner) ...[
+              _buildSummaryRow('Ongkir Diterima Runner', CurrencyFormatter.formatToIdr(runnerOngkir, withSymbol: true), isBold: true, color: primary),
+              const SizedBox(height: 8),
+              Text('Biaya makanan ditanggung requester • Fee merchant potong saat settlement (biaya layanan tidak tampil ke requester)', style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
+            ] else ...[
+              _buildSummaryRow('Harga Makanan', CurrencyFormatter.formatToIdr(order.estimatedCost, withSymbol: true)),
+              const SizedBox(height: 8),
+              _buildSummaryRow('Ongkos Kirim', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
+              const Divider(height: 24),
+              _buildSummaryRow('Total Pembayaran', CurrencyFormatter.formatToIdr(order.estimatedCost + baseJastip, withSymbol: true), isBold: true, color: primary),
+            ],
           ] else ...[
-            _buildSummaryRow('Biaya Titip / Ongkos Kirim', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Biaya Layanan', CurrencyFormatter.formatToIdr(order.serviceFee, withSymbol: true)),
-            const SizedBox(height: 8),
-            _buildSummaryRow('Biaya Pengecekan', CurrencyFormatter.formatToIdr(order.checkingFee, withSymbol: true)),
+            // Non-food: beli / kirim — requester hanya ongkir full, bukan bersih
+            if (order.serviceCategory == 'beli') ...[
+              _buildSummaryRow('Harga Barang', CurrencyFormatter.formatToIdr(order.estimatedCost, withSymbol: true)),
+              const SizedBox(height: 8),
+            ],
+            if (isRunner) ...[
+              _buildSummaryRow('Komisi Bersih Anda', CurrencyFormatter.formatToIdr(runnerOngkir, withSymbol: true)),
+            ] else ...[
+              _buildSummaryRow('Ongkos Kirim', CurrencyFormatter.formatToIdr(baseJastip, withSymbol: true)),
+            ],
+            const Divider(height: 24),
+            _buildSummaryRow(
+              isRunner ? 'Total Pendapatan/Reimbursement' : 'Total Pembayaran',
+              CurrencyFormatter.formatToIdr(isRunner ? (order.totalPayment) : (order.estimatedCost + baseJastip), withSymbol: true),
+              isBold: true,
+              color: primary,
+            ),
           ],
-          const Divider(height: 24),
-          _buildSummaryRow(
-            isRunner ? 'Total Pendapatan/Reimbursement' : 'Total Pembayaran', 
-            CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true), 
-            isBold: true, 
-            color: primary
-          ),
           const SizedBox(height: 12),
           _buildPaymentMethodTag(order.paymentMethod, primary, isRunner),
+          if (isFood && isRunner)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: const Color(0xFFFFF8E1), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFFC107).withValues(alpha: 0.3))),
+                child: Row(
+                  children: [
+                    const Icon(Icons.restaurant_rounded, size: 14, color: Color(0xFFE65100)),
+                    const SizedBox(width: 6),
+                    const Expanded(child: Text('FOOD: Hanya ongkir yang Anda terima. Biaya makanan tidak perlu talangi.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFBF360C)))),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

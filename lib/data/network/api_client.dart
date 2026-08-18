@@ -26,19 +26,26 @@ class ApiClient {
       ),
     );
 
-    // Latency tracking interceptor to detect poor connection
+    // Latency tracking & logging interceptor
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         options.extra['startTime'] = DateTime.now().millisecondsSinceEpoch;
+        if (kDebugMode) {
+          print('[API] REQUEST: ${options.method} ${options.baseUrl}${options.path}');
+        }
         return handler.next(options);
       },
       onResponse: (response, handler) {
         final startTime = response.requestOptions.extra['startTime'] as int?;
+        final duration = startTime != null ? DateTime.now().millisecondsSinceEpoch - startTime : 0;
+        if (kDebugMode) {
+          print('[API] RESPONSE: ${response.statusCode} ${response.requestOptions.path} (${duration}ms)');
+        }
         if (startTime != null) {
-          final duration = DateTime.now().millisecondsSinceEpoch - startTime;
-          if (duration > 3000) {
+          final durationMs = DateTime.now().millisecondsSinceEpoch - startTime;
+          if (durationMs > 3000) {
             onPoorConnectionChanged?.call(true);
-          } else if (duration < 1500) {
+          } else if (durationMs < 1500) {
             onPoorConnectionChanged?.call(false);
           }
         }

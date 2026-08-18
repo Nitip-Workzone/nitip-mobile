@@ -32,17 +32,20 @@ class ExploreOrdersState {
 class ExploreOrdersNotifier extends StateNotifier<ExploreOrdersState> {
   final OrderRepository _orderRepo;
   final Ref _ref;
+  DateTime? _lastFetchTime;
 
   ExploreOrdersNotifier(this._orderRepo, this._ref) : super(ExploreOrdersState());
 
   Future<void> fetchAvailableOrders({bool syncLocation = false, bool force = false}) async {
-    // Avoid overlapping fetches, but allow force override for realtime events
-    if (state.isLoading && !force && state.availableOrders.isNotEmpty) {
-      // If already loading and we have data, don't start another – but for realtime we allow force=true
-      if (!force) {
-        // ignore, wait existing
-      }
+    final now = DateTime.now();
+    // Avoid overlapping fetches within a short window (800ms) to prevent double/quadruple hits
+    if (state.isLoading && !force) {
+      return;
     }
+    if (_lastFetchTime != null && now.difference(_lastFetchTime!) < const Duration(milliseconds: 800)) {
+      return;
+    }
+    _lastFetchTime = now;
     final hasData = state.availableOrders.isNotEmpty;
     state = state.copyWith(isLoading: !hasData || force, error: null);
     try {

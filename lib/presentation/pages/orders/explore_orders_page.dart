@@ -41,15 +41,7 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Re-fetch when returning from background/detail – ensures cancelled orders removed without pull
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false, force: true);
-    });
-  }
+
 
   @override
   void dispose() {
@@ -97,11 +89,16 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
       appBar: AppBar(
         title: const Text(
           'Kelola Tugas & Order',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textMain),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textMain),
         ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textMain),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        leadingWidth: 40,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(46),
           child: Column(
@@ -165,13 +162,13 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
                   ),
                 ],
               ),
-              // Pool status banner – full width, distinct colors, not truncated
+              // Pool status banner – clean white, minimal, no green flashy
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: bgColor,
-                  border: Border(top: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor.withValues(alpha: 0.5))),
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.6))),
                 ),
                 child: Row(
                   children: [
@@ -250,7 +247,12 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
                             padding: const EdgeInsets.only(bottom: 16),
                             child: OrderCard(
                               order: order,
-                              onTap: () => context.push('/orders/detail/${order.id}'),
+                              onTap: () async {
+                                await context.push('/orders/detail/${order.id}');
+                                if (context.mounted) {
+                                  ref.read(activityProvider.notifier).fetchActivities();
+                                }
+                              },
                             ),
                           );
                         },
@@ -271,7 +273,12 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
       children: [
         OrderCard(
           order: order,
-          onTap: () => context.push('/orders/detail/${order.id}'),
+          onTap: () async {
+            await context.push('/orders/detail/${order.id}');
+            if (context.mounted) {
+              ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false, force: true);
+            }
+          },
         ),
         const SizedBox(height: 8),
         SizedBox(
@@ -365,7 +372,10 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
         ),
       );
       // Direct opening order detail upon accepting the order
-      context.push('/orders/detail/$orderId');
+      await context.push('/orders/detail/$orderId');
+      if (context.mounted) {
+        ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false, force: true);
+      }
     } else {
       final error = ref.read(exploreOrdersProvider).error ?? 'Gagal mengambil pesanan';
       if (error.contains('KycRequiredException') || error.contains('KYC_REQUIRED') || error.contains('verifikasi e-KYC')) {

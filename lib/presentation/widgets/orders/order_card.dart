@@ -15,76 +15,68 @@ class OrderCard extends StatelessWidget {
     this.primaryColor = AppColors.primary,
   });
 
+  bool get isFood => (order.merchantId != null && order.merchantId!.isNotEmpty) || order.itemDetails.toLowerCase().contains('nitip food');
+
   @override
   Widget build(BuildContext context) {
+    final bool food = isFood;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
+          // Clean white — tidak pakai warna background, hanya accent dot untuk food agar estetik & cepat beda
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.6), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Top row — clean white, no PENDING for runner (hanya BELI/KIRIM/FOOD badge + date) + fix overflow
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(order.status).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        order.status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _getStatusColor(order.status),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                // Hanya kategori BELI/KIRIM/FOOD, tidak tampil PENDING untuk runner (sesuai request)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (order.serviceCategory == 'kirim' ? Colors.blue : Colors.orange).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    order.serviceCategory.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: order.serviceCategory == 'kirim' ? Colors.blue : Colors.orange.shade800,
+                      letterSpacing: 0.5,
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (order.serviceCategory == 'kirim' ? Colors.blue : Colors.orange).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        order.serviceCategory.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: order.serviceCategory == 'kirim' ? Colors.blue : Colors.orange.shade800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                Text(
-                  order.formattedCreatedAt,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                Flexible(
+                  child: Text(
+                    order.formattedCreatedAt,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
+                // Accent left bar untuk food — pembeda cepat tanpa background warna jelek
+                if (food)
+                  Container(width: 3, height: 48, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2))),
+                if (food) const SizedBox(width: 12),
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -102,25 +94,49 @@ class OrderCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        order.itemDetails,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textMain,
-                        ),
+                      Row(
+                        children: [
+                          if (food)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.border, width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.restaurant_outlined, size: 10, color: AppColors.textMuted),
+                                  SizedBox(width: 3),
+                                  Text('FOOD', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.5)),
+                                ],
+                              ),
+                            ),
+                          if (food) const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              order.itemDetails,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textMain),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Total: ${CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
+                      const SizedBox(height: 6),
+                      // Food: hanya ongkir diterima — clean white, tanpa background kuning/hijau jelek
+                      food
+                          ? Text(
+                              CurrencyFormatter.formatToIdr(order.deliveryFee - order.serviceFee - order.checkingFee, withSymbol: true),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMain),
+                            )
+                          : Text(
+                              'Total: ${CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true)}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                                              color: AppColors.textMuted,
+                              ),
+                            ),
                     ],
                   ),
                 ),
@@ -166,16 +182,19 @@ class OrderCard extends StatelessWidget {
             ] else ...[
               Row(
                 children: [
-                  _buildInfoItem(Icons.scale_outlined, '${order.weightKg}kg'),
-                  const SizedBox(width: 16),
-                  _buildInfoItem(Icons.inventory_2_outlined, _getVolumeLabel(order.volumeLiters)),
+                  Flexible(child: _buildInfoItem(Icons.scale_outlined, '${order.weightKg}kg')),
+                  const SizedBox(width: 12),
+                  Flexible(child: _buildInfoItem(Icons.inventory_2_outlined, _getVolumeLabel(order.volumeLiters))),
                   const Spacer(),
-                  Text(
-                    order.paymentMethod == 'escrow' ? 'Saldo Dompet' : 'COD',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: order.paymentMethod == 'escrow' ? AppColors.primary : Colors.orange.shade800,
+                  Flexible(
+                    child: Text(
+                      order.paymentMethod == 'escrow' ? 'Saldo Dompet' : 'COD',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: order.paymentMethod == 'escrow' ? AppColors.primary : Colors.orange.shade800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
