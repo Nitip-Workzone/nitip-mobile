@@ -2353,6 +2353,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
 
   Widget _buildUploadedImagesSection(OrderModel order, Color primary) {
+    // Backend single source of truth https://upload.nihtip.com/ — FE menerima url mentah langsung tanpa tambahan
     final hasReceipt = order.receiptImageUrl != null && order.receiptImageUrl!.trim().isNotEmpty;
     final hasDeliveryProof = order.deliveryImageUrl != null && order.deliveryImageUrl!.trim().isNotEmpty;
 
@@ -2526,6 +2527,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       qrisUrl = qrisStr;
     }
 
+    // ignore: unused_local_variable
     final isSandbox = qrisStr.contains('sandbox') ||
         qrisStr.contains('mock') ||
         qrisStr.contains('localhost') ||

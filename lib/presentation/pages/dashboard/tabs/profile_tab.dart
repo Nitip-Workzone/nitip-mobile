@@ -42,20 +42,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   String? _getAvatarUrl(String? path) {
+    // Backend single source of truth https://upload.nihtip.com/ — FE menerima url mentah langsung tanpa tambahan
     if (path == null || path.isEmpty) return null;
-    final trimmed = path.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    try {
-      final baseUri = Uri.parse(AppConfig.baseUrl);
-      final hostUrl = baseUri.origin;
-      if (trimmed.startsWith('/') || trimmed.startsWith('avatars/') || trimmed.startsWith('uploads/')) {
-        final clean = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
-        return "$hostUrl/$clean";
-      }
-      return "$hostUrl/uploads/$trimmed";
-    } catch (_) {
-      return trimmed;
-    }
+    return path.trim();
   }
 
   String _getRoleLabel(User? user) {

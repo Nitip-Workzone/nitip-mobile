@@ -62,6 +62,29 @@ class AppConfig {
 
   static bool get isDev => env == 'dev';
 
+  // ASSET_BASE_URL — single source truth final read https://upload.nihtip.com/ default, configurable via dart-define
+  static const String assetBaseUrl = String.fromEnvironment(
+    'ASSET_BASE_URL',
+    defaultValue: 'https://upload.nihtip.com/',
+  );
+
+  // Alias for backward compat
+  static const String uploadBaseUrl = String.fromEnvironment(
+    'UPLOAD_BASE_URL',
+    defaultValue: 'https://upload.nihtip.com/',
+  );
+
+  static String get resolvedAssetBaseUrl {
+    // Fallback chain: ASSET_BASE_URL > UPLOAD_BASE_URL > https://upload.nihtip.com/
+    if (assetBaseUrl.isNotEmpty && !assetBaseUrl.contains('myqcloud.com')) {
+      return assetBaseUrl.endsWith('/') ? assetBaseUrl : '$assetBaseUrl/';
+    }
+    if (uploadBaseUrl.isNotEmpty && !uploadBaseUrl.contains('myqcloud.com')) {
+      return uploadBaseUrl.endsWith('/') ? uploadBaseUrl : '$uploadBaseUrl/';
+    }
+    return 'https://upload.nihtip.com/';
+  }
+
   /// Toggle untuk validasi KYC di sisi klien
   static bool isKycRequired = false;
   static String withdrawalSchedule = 'Setiap hari pukul 09:00 WITA';

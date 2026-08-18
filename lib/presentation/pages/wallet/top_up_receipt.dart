@@ -38,52 +38,37 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
   final GlobalKey _qrKey = GlobalKey();
   bool _isChecking = false;
   bool _isSaving = false;
-  Timer? _pollingTimer;
+  // _pollingTimer removed — 5s QRIS polling replaced by FCM transaction_status via dispatcher collapse_id wallet_{user}
 
   @override
   void initState() {
     super.initState();
     tx = widget.initialTx;
+    // No polling — FCM wallet_update + transaction_status handles payment confirmation via backend Xendit webhook enqueueFCM
     if (tx.status == 'pending') {
-      _startPolling();
+      // Fallback manual check after 30s if no FCM (poor network) — no interval, single delayed
+      Future.delayed(const Duration(seconds: 30), () async {
+        if (!mounted) return;
+        if (tx.status != 'pending') return;
+        // Single fallback fetch, not periodic
+        final updated = await ref.read(walletProvider.notifier).checkTransactionStatus(tx.reference!);
+        if (mounted && updated != null && updated.status != 'pending') {
+          setState(() => tx = updated);
+        }
+      });
     }
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
+  // ignore: unused_element
   void _startPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      if (tx.reference == null) return;
-      if (tx.status != 'pending') {
-        _pollingTimer?.cancel();
-        return;
-      }
-      
-      final updatedTx = await ref.read(walletProvider.notifier).checkTransactionStatus(tx.reference!);
-      
-      if (mounted && updatedTx != null && updatedTx.status != tx.status) {
-        setState(() {
-          tx = updatedTx;
-        });
-        
-        if (tx.status == 'completed') {
-          _pollingTimer?.cancel();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pembayaran berhasil!'), backgroundColor: AppColors.success),
-          );
-        } else if (tx.status == 'failed') {
-          _pollingTimer?.cancel();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pembayaran gagal.'), backgroundColor: AppColors.error),
-          );
-        }
-      }
-    });
+    // No-op — FCM transaction_status + wallet_update replaces polling (5s interval removed)
+    // ignore: avoid_print
+    print('[top_up_receipt] _startPolling removed — using FCM, no 5s interval');
   }
 
   Future<void> _checkStatus() async {
@@ -101,12 +86,10 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
       });
       
       if (tx.status == 'completed') {
-        _pollingTimer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pembayaran berhasil!'), backgroundColor: AppColors.success),
         );
       } else if (tx.status == 'failed') {
-        _pollingTimer?.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pembayaran gagal.'), backgroundColor: AppColors.error),
         );

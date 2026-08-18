@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/order_status_service.dart';
@@ -82,7 +81,6 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
   final Ref _ref;
   final String orderId;
   StreamSubscription<OrderStatusEvent>? _sub;
-  Timer? _fallbackTimer;
   Timer? _reconnectTimer;
   Timer? _debounceFetchTimer;
   bool _shouldRun = true;
@@ -129,21 +127,11 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
     // Initial connect
     _connectLoop();
 
-    // Smart fallback polling: 15s + jitter 0-3s, only if foreground + intermediate + !live
-    _fallbackTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_disposed || !_shouldRun) return;
-      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
-      if (state.isTerminal) return;
-      final svc = _ref.read(orderStatusServiceProvider);
-      if (svc.isRunning || state.isLive) return;
-
-      // Jitter to avoid thundering herd
-      final jitterMs = math.Random().nextInt(3000);
-      Future.delayed(Duration(milliseconds: jitterMs), () {
-        if (_disposed || !_shouldRun) return;
-        _fallbackFetch();
-      });
-    });
+    // Fallback polling 15s removed — replaced by FCM order_status_changed + SSE order:{id} via dispatcher collapse_id order_{id}
+    // No Timer.periodic — FCM maximizes antrian per-device bucket 20/10m refill 3m, prevents limit hit
+    // FCM in main.dart handles order_status_changed → patchOrderStatus
+    // ignore: avoid_print
+    print('[order_status] Fallback 15s polling removed — using FCM order_status_changed + SSE primary');
   }
 
   void _debouncedFullFetch() {
@@ -162,6 +150,7 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
     });
   }
 
+  // ignore: unused_element — kept for manual fallback if FCM+SSE both fail (no periodic Timer now)
   Future<void> _fallbackFetch() async {
     if (_disposed || !_shouldRun) return;
     if (state.isTerminal) return;
@@ -241,9 +230,23 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
     }
   }
 
+  // FCM handler — replaces 15s polling, called from main.dart onMessage when type order_status_changed
+  void handleFcmStatus(String newStatus) {
+    if (_disposed || !_shouldRun) return;
+    if (newStatus.isEmpty) return;
+    if (state.status == newStatus) return;
+    state = state.copyWith(status: newStatus, hasFetched: true, isLive: true);
+    try {
+      _ref.read(activityProvider.notifier).patchOrderStatus(orderId, newStatus);
+    } catch (_) {}
+    _debouncedFullFetch();
+    if (state.isTerminal) {
+      stop();
+    }
+  }
+
   void stop() {
     _shouldRun = false;
-    _fallbackTimer?.cancel();
     _reconnectTimer?.cancel();
     _debounceFetchTimer?.cancel();
     try {
@@ -258,7 +261,6 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
     _shouldRun = false;
     WidgetsBinding.instance.removeObserver(this);
     _sub?.cancel();
-    _fallbackTimer?.cancel();
     _reconnectTimer?.cancel();
     _debounceFetchTimer?.cancel();
     try {

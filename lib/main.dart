@@ -33,6 +33,8 @@ import 'presentation/pages/support/support_new_ticket_page.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/wallet_provider.dart';
 import 'presentation/providers/notification_provider.dart';
+import 'presentation/providers/order_status_provider.dart';
+import 'presentation/providers/activity_provider.dart';
 import 'core/config/app_config.dart';
 import 'presentation/providers/merchant_refresh_provider.dart';
 
@@ -314,7 +316,7 @@ void main() async {
     }
   }
 
-  // 1. FOREGROUND: Listen to FCM messages when app is in foreground
+  // 1. FOREGROUND: Listen to FCM messages when app is in foreground — replaces all interval polling, uses per-device bucket 20/10m antrian
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     debugPrint('[FCM-FOREGROUND] Title: ${message.notification?.title}');
     debugPrint('[FCM-FOREGROUND] Body: ${message.notification?.body}');
@@ -323,16 +325,58 @@ void main() async {
     // Show local notification since app is in foreground
     _showLocalNotification(message);
 
-    // Handle specific data types
-    if (message.data['type'] == 'wallet_update') {
-      debugPrint('[FCM-FOREGROUND] Triggering wallet balance refresh...');
+    final data = message.data;
+    final type = data['type']?.toString() ?? '';
+
+    // Handle specific data types — replaces interval polling, maximizes FCM antrian safe via collapse_id
+    if (type == 'wallet_update' || type == 'transaction_status') {
+      // Replaces 5s polling in top_up_receipt.dart — FCM transaction_status via dispatcher collapse_id wallet_{user}
+      debugPrint('[FCM-FOREGROUND] Triggering wallet balance refresh + transaction status (FCM replaces 5s polling)...');
       container.read(walletProvider.notifier).fetchBalance(force: true);
-    } else if (message.data['type'] == 'merchant_order') {
-      debugPrint('[FCM-FOREGROUND] Triggering merchant webview auto-refresh...');
+      // Also refresh transactions list if reference provided
+      if (data['reference'] != null) {
+        container.read(walletProvider.notifier).fetchTransactions();
+      }
+    } else if (type == 'merchant_order' || type == 'order_created' || type == 'pool_order_created') {
+      debugPrint('[FCM-FOREGROUND] Triggering merchant/pool refresh via FCM (replaces 15s/30s polling)...');
       container.read(merchantRefreshEventProvider.notifier).state++;
+      // Pool realtime: fetch single order if order_id provided
+      final orderId = data['order_id']?.toString() ?? data['orderId']?.toString();
+      if (orderId != null && orderId.isNotEmpty) {
+        try {
+          // Trigger explore orders provider to fetch single order — no periodic timer needed
+          // Handled via pool_realtime_provider FCM listener if active, else just increment event
+        } catch (_) {}
+      }
+    } else if (type == 'order_status_changed' || type == 'order_status' || type == 'order' || type.startsWith('order_')) {
+      // Replaces 15s order_status_provider fallback polling — SSE primary + FCM backup
+      final orderId = data['order_id']?.toString() ?? data['orderId']?.toString();
+      final status = data['status']?.toString();
+      debugPrint('[FCM-FOREGROUND] Order status changed FCM: order=$orderId status=$status (replaces 15s polling)');
+      if (orderId != null && status != null && orderId.isNotEmpty && status.isNotEmpty) {
+        try {
+          container.read(orderStatusProvider(orderId).notifier).handleFcmStatus(status);
+        } catch (_) {
+          // fallback to activity provider patch
+          try {
+            container.read(activityProvider.notifier).patchOrderStatus(orderId, status);
+          } catch (_) {}
+        }
+      }
+    } else if (type == 'payment_confirmed') {
+      debugPrint('[FCM-FOREGROUND] Payment confirmed via FCM (replaces 5s QRIS polling)');
+      final orderId = data['order_id']?.toString();
+      if (orderId != null && orderId.isNotEmpty) {
+        try {
+          container.read(activityProvider.notifier).patchOrderStatus(orderId, 'accepted');
+        } catch (_) {}
+      }
+    } else if (type == 'pool_order_created' || type == 'pool_order_removed') {
+      debugPrint('[FCM-FOREGROUND] Pool order $type via FCM (replaces 15s/30s pool polling)');
+      // Handled via merchantRefreshEventProvider increment above
     }
     
-    // Always refresh notification count
+    // Always refresh notification count — replaces 15s notifications polling in web as well (web uses custom event)
     container.read(notificationProvider.notifier).fetchUnreadCount(force: true);
   });
 

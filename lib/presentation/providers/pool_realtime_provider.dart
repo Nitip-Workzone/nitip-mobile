@@ -124,23 +124,10 @@ class PoolRealtimeNotifier extends StateNotifier<PoolRealtimeState> with Widgets
     // Initial connect
     _connectLoop();
 
-    // Low burden polling: when not live 15s, when live 30s (still catches miss)
-    _fallbackTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (!_shouldRun) return;
-      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
-      final svc = _ref.read(poolRealtimeServiceProvider);
-      if (!svc.isRunning && !state.isLive) {
-        final jitter = (DateTime.now().millisecondsSinceEpoch % 2000);
-        Future.delayed(Duration(milliseconds: jitter), () {
-          if (_disposed || !_shouldRun) return;
-          _ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false);
-        });
-      } else if (state.isLive) {
-        // When live, refresh every 30s as safety net for cell edge miss
-        if (DateTime.now().millisecondsSinceEpoch % 30000 < 15000) return;
-        _ref.read(exploreOrdersProvider.notifier).fetchAvailableOrders(syncLocation: false);
-      }
-    });
+    // Fallback polling 15s/30s removed — replaced by FCM pool_order_created + SSE PoolRealtimeService
+    // No Timer.periodic — FCM antrian per-device bucket 20/10m prevents limit, collapse_id pool_{cell}
+    // ignore: avoid_print
+    print('[pool_realtime] Fallback 15s/30s polling removed — using FCM pool_order_created + SSE primary, manual pull-to-refresh as fallback');
   }
 
   Timer? _debounceTimer;
