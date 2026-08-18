@@ -125,18 +125,31 @@ class OrderCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      // Food: hanya ongkir diterima — clean white, tanpa background kuning/hijau jelek
-                      food
-                          ? Text(
-                              CurrencyFormatter.formatToIdr(order.deliveryFee - order.serviceFee - order.checkingFee, withSymbol: true),
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMain),
-                            )
-                          : Text(
-                              'Total: ${CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true)}',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                                              color: AppColors.textMuted,
+                      // Price row — show payment method tag inline with price
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          food
+                              ? Text(
+                                  CurrencyFormatter.formatToIdr(order.deliveryFee - order.serviceFee - order.checkingFee, withSymbol: true),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMain),
+                                )
+                              : Text(
+                                  'Total: ${CurrencyFormatter.formatToIdr(order.totalPayment, withSymbol: true)}',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                                ),
+                          if (!order.isCompleted && !order.isCancelled)
+                            Text(
+                              order.paymentMethod == 'escrow' ? 'Saldo Dompet' : 'COD',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: order.paymentMethod == 'escrow' ? AppColors.primary : Colors.orange.shade800,
                               ),
                             ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -180,23 +193,13 @@ class OrderCard extends StatelessWidget {
                 ],
               ),
             ] else ...[
+              // Active: show weight + volume only (payment already shown inline above)
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(child: _buildInfoItem(Icons.scale_outlined, '${order.weightKg}kg')),
+                  _buildInfoItem(Icons.scale_outlined, '${order.weightKg}kg'),
                   const SizedBox(width: 12),
-                  Flexible(child: _buildInfoItem(Icons.inventory_2_outlined, _getVolumeLabel(order.volumeLiters))),
-                  const Spacer(),
-                  Flexible(
-                    child: Text(
-                      order.paymentMethod == 'escrow' ? 'Saldo Dompet' : 'COD',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: order.paymentMethod == 'escrow' ? AppColors.primary : Colors.orange.shade800,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  _buildInfoItem(Icons.inventory_2_outlined, _getVolumeLabel(order.volumeLiters)),
                 ],
               ),
             ],

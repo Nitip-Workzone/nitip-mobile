@@ -756,7 +756,9 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       );
     }
 
-    final bool isActiveRunnerTask = isRunner && order.status != 'pending';
+    final bool isActiveRunnerTask = isRunner && 
+        order.status != 'pending' && 
+        order.status != 'merchant_accepted';
     final isCompleted = order.status == 'completed' || _localCompleted;
 
     return Scaffold(
@@ -804,7 +806,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   Widget _buildPreviewLayout(OrderModel order, Color primary, bool isRunner) {
     final isDelivering = order.status == 'delivering';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 220),
       children: [
         _buildStatusHeader(order, primary, isRunner),
         const SizedBox(height: 20),
@@ -934,7 +936,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     final bool isCompleted = order.status == 'completed';
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 220),
       children: [
         // ── 1. Hero Status Header (full-width colored strip) ──
         _buildRunnerStatusHeader(order, primary),
@@ -2064,7 +2066,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
     Widget? mainAction;
 
     if (isRunner) {
-      if (order.status == 'pending') {
+      if (order.status == 'pending' || order.status == 'merchant_accepted') {
         mainAction = _buildActionButton(
           label: 'Ambil Tugas Ini',
           icon: Icons.check_circle_outline_rounded,
@@ -2227,7 +2229,8 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
         );
         return;
       }
-      _showSnackBar(error, isError: true);
+      final cleanError = error.replaceFirst('Exception: ', '');
+      _showSnackBar(cleanError, isError: true);
     }
   }
 
@@ -3138,7 +3141,10 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
       }
     }
 
-    final isAllowedToCancel = canNormalCancel || (isStagnant && (isRequester || isRunner || isMerchant));
+    final user = ref.read(authProvider).user;
+    final isAssignedRunner = isRunner && order.runnerId == user?.id;
+
+    final isAllowedToCancel = canNormalCancel || (isStagnant && (isRequester || isAssignedRunner || isMerchant));
     if (!isAllowedToCancel) return null;
 
     return Container(

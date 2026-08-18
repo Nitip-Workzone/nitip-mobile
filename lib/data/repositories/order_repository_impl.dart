@@ -45,25 +45,35 @@ class OrderRepositoryImpl implements OrderRepository {
 
   @override
   Future<void> cancelOrder(String id, {String? reason}) async {
-    final response = await _apiClient.dio.post(
-      '/orders/$id/cancel',
-      data: reason != null ? {'reason': reason} : null,
-    );
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/$id/cancel',
+        data: reason != null ? {'reason': reason} : null,
+      );
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> disputeOrder(String id, String reason, String proofUrl) async {
-    final response = await _apiClient.dio.post(
-      '/orders/$id/dispute',
-      data: {
-        'reason': reason,
-        'proof_url': proofUrl,
-      },
-    );
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/$id/dispute',
+        data: {
+          'reason': reason,
+          'proof_url': proofUrl,
+        },
+      );
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
@@ -78,77 +88,112 @@ class OrderRepositoryImpl implements OrderRepository {
 
   @override
   Future<void> acceptOrder(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/accept');
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/accept');
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> purchaseOrder(String id, String receiptPath) async {
-    final formData = FormData.fromMap({
-      'receipt': await MultipartFile.fromFile(
-        receiptPath,
-        filename: receiptPath.split('/').last,
-      ),
-    });
-    final response = await _apiClient.dio.post('/orders/$id/purchased', data: formData);
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final formData = FormData.fromMap({
+        'receipt': await MultipartFile.fromFile(
+          receiptPath,
+          filename: receiptPath.split('/').last,
+        ),
+      });
+      final response = await _apiClient.dio.post('/orders/$id/purchased', data: formData);
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> adjustPrice(String id, double adjustedCost, String reason) async {
-    final response = await _apiClient.dio.post('/orders/$id/adjust-price', data: {
-      'adjusted_cost': adjustedCost,
-      'reason': reason,
-    });
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/adjust-price', data: {
+        'adjusted_cost': adjustedCost,
+        'reason': reason,
+      });
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> approveAdjustment(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/approve-adjustment');
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/approve-adjustment');
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> pickupOrder(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/pickup');
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/pickup');
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> completeOrder(String id, String completionCode, String deliveryImagePath) async {
-    final formData = FormData.fromMap({
-      'completion_code': completionCode,
-    });
-    if (deliveryImagePath.isNotEmpty) {
-      formData.files.add(MapEntry(
-        'delivery_image',
-        await MultipartFile.fromFile(
-          deliveryImagePath,
-          filename: deliveryImagePath.split('/').last,
-        ),
-      ));
+    try {
+      final formData = FormData.fromMap({
+        'completion_code': completionCode,
+      });
+      if (deliveryImagePath.isNotEmpty) {
+        formData.files.add(MapEntry(
+          'delivery_image',
+          await MultipartFile.fromFile(
+            deliveryImagePath,
+            filename: deliveryImagePath.split('/').last,
+          ),
+        ));
+      }
+      final response = await _apiClient.dio.post('/orders/$id/complete', data: formData);
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
     }
-    final response = await _apiClient.dio.post('/orders/$id/complete', data: formData);
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
   }
 
   @override
   Future<Map<String, dynamic>> estimateFee(Map<String, dynamic> data, {CancelToken? cancelToken}) async {
-    final response = await _apiClient.dio.post(
-      '/orders/estimate-fee',
-      data: data,
-      cancelToken: cancelToken,
-    );
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data as Map<String, dynamic>);
-    if (apiResponse.data == null) throw Exception(apiResponse.message);
-    return apiResponse.data!;
+    try {
+      final response = await _apiClient.dio.post(
+        '/orders/estimate-fee',
+        data: data,
+        cancelToken: cancelToken,
+      );
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data as Map<String, dynamic>);
+      if (apiResponse.data == null) throw Exception(apiResponse.message);
+      return apiResponse.data!;
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
@@ -163,15 +208,25 @@ class OrderRepositoryImpl implements OrderRepository {
 
   @override
   Future<void> merchantAcceptOrder(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/merchant-accept');
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/merchant-accept');
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 
   @override
   Future<void> merchantReadyOrder(String id) async {
-    final response = await _apiClient.dio.post('/orders/$id/merchant-ready');
-    final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
-    if (!apiResponse.success) throw Exception(apiResponse.message);
+    try {
+      final response = await _apiClient.dio.post('/orders/$id/merchant-ready');
+      final apiResponse = ApiResponse.fromJson(response.data, (data) => data);
+      if (!apiResponse.success) throw Exception(apiResponse.message);
+    } on DioException catch (e) {
+      final message = e.response?.data['message'] ?? 'Terjadi kesalahan jaringan';
+      throw Exception(message);
+    }
   }
 }

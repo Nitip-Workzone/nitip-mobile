@@ -91,14 +91,23 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
           'Kelola Tugas & Order',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textMain),
         ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textMain),
-          onPressed: () => Navigator.of(context).maybePop(),
+        titleSpacing: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.chevron_left, color: AppColors.textMain, size: 22),
+            ),
+          ),
         ),
-        leadingWidth: 40,
+        leadingWidth: 56,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(46),
           child: Column(
@@ -405,9 +414,10 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
         );
         return;
       }
+      final cleanError = error.replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error),
+          content: Text(cleanError),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),

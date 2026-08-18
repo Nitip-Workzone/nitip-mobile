@@ -179,17 +179,20 @@ class OrderStatusNotifier extends StateNotifier<OrderStatusState>
     if (state.isTerminal) return;
 
     try {
+      if (_disposed) return;
       state = state.copyWith(isConnecting: true);
       final svc = _ref.read(orderStatusServiceProvider);
       await svc.connect(orderId: orderId);
       // connect() returns when disconnected (server closed or error)
+      if (_disposed) return;
       state = state.copyWith(isLive: false, isConnecting: false);
-      if (_disposed || !_shouldRun) return;
+      if (!_shouldRun) return;
       if (state.isTerminal) return;
       _scheduleReconnect();
     } catch (_) {
+      if (_disposed) return;
       state = state.copyWith(isLive: false, isConnecting: false);
-      if (_disposed || !_shouldRun) return;
+      if (!_shouldRun) return;
       _scheduleReconnect();
     }
   }
