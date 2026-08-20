@@ -60,26 +60,18 @@ class _ExploreOrdersPageState extends ConsumerState<ExploreOrdersPage> with Sing
 
     // Pool status colors & labels – distinct, not truncated
     Color dotColor;
-    Color bgColor;
-    Color borderColor;
     Color textColor;
     IconData statusIcon;
     if (poolState.isLive) {
       dotColor = const Color(0xFF22C55E);
-      bgColor = const Color(0xFF22C55E).withValues(alpha: 0.12);
-      borderColor = const Color(0xFF22C55E).withValues(alpha: 0.3);
       textColor = const Color(0xFF15803D);
       statusIcon = Icons.bolt_rounded;
     } else if (poolState.isConnecting) {
       dotColor = const Color(0xFFF59E0B);
-      bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.15);
-      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.35);
       textColor = const Color(0xFF9A5A00);
       statusIcon = Icons.sync_rounded;
     } else {
       dotColor = const Color(0xFF64748B);
-      bgColor = const Color(0xFF64748B).withValues(alpha: 0.12);
-      borderColor = const Color(0xFF64748B).withValues(alpha: 0.25);
       textColor = const Color(0xFF475569);
       statusIcon = Icons.cloud_sync_rounded;
     }

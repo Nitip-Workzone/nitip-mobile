@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/crash_service.dart';
@@ -65,6 +66,26 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
         _isHandlingSessionExpired = false;
       }
     });
+  }
+
+  void _handleReceivedToken(String token) async {
+    if (token.isEmpty) return;
+    debugPrint('[WebView-Merchant] Received token from WebView: $token');
+    
+    final authNotifier = ref.read(authProvider.notifier);
+    final authState = ref.read(authProvider);
+    
+    // Simpan token ke secure storage jika berbeda
+    if (authState.accessToken != token) {
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'access_token', value: token);
+      
+      // Update status auth dan ambil profil baru (akan memicu sinkronisasi FCM secara otomatis)
+      await authNotifier.checkAuthStatus();
+    } else {
+      // Jika token sama, tetap paksa sync token FCM agar terdaftar di backend
+      await authNotifier.syncFcmToken();
+    }
   }
 
   bool _isLoginWebPage(Uri uri) {
@@ -149,6 +170,7 @@ class _MerchantDashboardPageState extends ConsumerState<MerchantDashboardPage> {
         }
       })
       ..addJavaScriptChannel('NitipLogout', onMessageReceived: (_) => _handleSessionExpired())
+      ..addJavaScriptChannel('NitipToken', onMessageReceived: (JavaScriptMessage msg) => _handleReceivedToken(msg.message))
       ..setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: (_) => NavigationDecision.navigate,
         onPageStarted: (url) {

@@ -196,11 +196,12 @@ final FlutterLocalNotificationsPlugin _localNotificationsPlugin = FlutterLocalNo
 Future<void> _initLocalNotifications() async {
   // Android channel
   const androidChannel = AndroidNotificationChannel(
-    'nitip_high_importance', // id
+    'nitip_iconic_notifications_v1', // id
     'Nitip Notifications',   // name
-    description: 'Notifikasi penting dari Nitip',
+    description: 'Notifikasi penting dengan suara ikonik Nitip',
     importance: Importance.high,
     playSound: true,
+    sound: RawResourceAndroidNotificationSound('nitip_chime'),
   );
 
   // Create the Android notification channel
@@ -234,12 +235,13 @@ void _showLocalNotification(RemoteMessage message) {
   if (notification == null) return;
 
   final androidDetails = AndroidNotificationDetails(
-    'nitip_high_importance',
+    'nitip_iconic_notifications_v1',
     'Nitip Notifications',
-    channelDescription: 'Notifikasi penting dari Nitip',
+    channelDescription: 'Notifikasi penting dengan suara ikonik Nitip',
     importance: Importance.high,
     priority: Priority.high,
     playSound: true,
+    sound: const RawResourceAndroidNotificationSound('nitip_chime'),
     icon: '@mipmap/launcher_icon',
   );
 
@@ -249,6 +251,7 @@ void _showLocalNotification(RemoteMessage message) {
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: 'nitip_chime.wav',
     ),
   );
 

@@ -65,10 +65,18 @@ class _OpenTripSheetState extends ConsumerState<OpenTripSheet> {
   @override
   void initState() {
     super.initState();
-    _originLocation = LatLng(_locations[0]['lat'], _locations[0]['lng']);
-    _originAddress = _locations[0]['name'];
-    _destinationLocation = LatLng(_locations[1]['lat'], _locations[1]['lng']);
-    _destinationAddress = _locations[1]['name'];
+    final currentLoc = ref.read(userLocationProvider);
+    if (currentLoc != null) {
+      _originLocation = currentLoc;
+      _originAddress = 'Lokasi Saya Saat Ini';
+    } else {
+      _originLocation = LatLng(_locations[0]['lat'], _locations[0]['lng']);
+      _originAddress = _locations[0]['name'];
+    }
+
+    // Titik tujuan dikosongkan agar diisi manual oleh user
+    _destinationLocation = null;
+    _destinationAddress = null;
   }
 
   @override
@@ -134,9 +142,29 @@ class _OpenTripSheetState extends ConsumerState<OpenTripSheet> {
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
+      if (_originLocation == null || _originAddress == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan pilih titik keberangkatan!'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      if (_destinationLocation == null || _destinationAddress == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Silakan pilih titik tujuan!'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
       if (_originAddress == _destinationAddress || 
-          (_originLocation != null && _destinationLocation != null &&
-           _originLocation!.latitude == _destinationLocation!.latitude && 
+          (_originLocation!.latitude == _destinationLocation!.latitude && 
            _originLocation!.longitude == _destinationLocation!.longitude)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
